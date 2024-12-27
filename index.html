@@ -47,6 +47,19 @@
         #inhibitBtn:hover {
             background: #444;
         }
+        .info-panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            max-width: 250px;
+        }
+        #effects {
+            font-size: 14px;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
@@ -57,11 +70,18 @@
     
     <div class="controls">
         <select id="ntType">
-            <option value="excitatory">Excitatory (Glutamate)</option>
-            <option value="inhibitory">Inhibitory (GABA)</option>
+            <option value="DOPAMINE">Dopamine (Reward)</option>
+            <option value="SEROTONIN">Serotonin (Mood)</option>
+            <option value="GLUTAMATE">Glutamate (Excitatory)</option>
+            <option value="GABA">GABA (Inhibitory)</option>
+            <option value="NOREPINEPHRINE">Norepinephrine (Arousal)</option>
         </select>
         <button id="releaseBtn">Release Neurotransmitters</button>
         <button id="resetBtn">Reset</button>
+    </div>
+    <div class="info-panel">
+        <h3>Current Effects:</h3>
+        <div id="effects"></div>
     </div>
 
     <script type="importmap">

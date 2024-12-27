@@ -1,28 +1,85 @@
 import * as THREE from 'three';
 
+const NEUROTRANSMITTER_TYPES = {
+    DOPAMINE: {
+        name: 'Dopamine',
+        color: 0x9933ff, // Purple
+        speed: 0.12,
+        size: 0.25,
+        description: 'Reward and pleasure signaling',
+        reuptakeRate: 0.8,
+        maoSensitive: true,
+        degradationRate: 0.6
+    },
+    SEROTONIN: {
+        name: 'Serotonin',
+        color: 0xff9933, // Orange
+        speed: 0.1,
+        size: 0.22,
+        description: 'Mood and emotional regulation',
+        reuptakeRate: 0.7,
+        maoSensitive: true,
+        degradationRate: 0.7
+    },
+    GLUTAMATE: {
+        name: 'Glutamate',
+        color: 0x4444ff, // Blue
+        speed: 0.15,
+        size: 0.2,
+        description: 'Primary excitatory neurotransmitter',
+        reuptakeRate: 0.9,
+        maoSensitive: false,
+        degradationRate: 0.3
+    },
+    GABA: {
+        name: 'GABA',
+        color: 0x44ff44, // Green
+        speed: 0.08,
+        size: 0.23,
+        description: 'Primary inhibitory neurotransmitter',
+        reuptakeRate: 0.6,
+        maoSensitive: false,
+        degradationRate: 0.3
+    },
+    NOREPINEPHRINE: {
+        name: 'Norepinephrine',
+        color: 0xff4444, // Red
+        speed: 0.13,
+        size: 0.21,
+        description: 'Arousal and attention',
+        reuptakeRate: 0.75,
+        maoSensitive: true,
+        degradationRate: 0.65
+    }
+};
+
 class Neurotransmitter {
     constructor(position, type) {
-        const geometry = new THREE.SphereGeometry(0.2, 16, 16);
+        const ntProperties = NEUROTRANSMITTER_TYPES[type];
+        const geometry = new THREE.SphereGeometry(ntProperties.size, 16, 16);
         const material = new THREE.MeshPhongMaterial({
-            color: type === 'excitatory' ? 0x4444ff : 0x44ff44,
-            shininess: 100
+            color: ntProperties.color,
+            shininess: 100,
+            emissive: ntProperties.color,
+            emissiveIntensity: 0.2
         });
         
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.copy(position);
         this.type = type;
+        this.properties = ntProperties;
         this.bound = false;
         this.reuptaking = false;
 
         // Create more directed movement toward receptors
-        const targetX = 4; // Position near receptors
+        const targetX = 4;
         const directionX = targetX - position.x;
-        const spread = 0.3; // Reduced spread for more focused movement
+        const spread = 0.3;
 
         this.velocity = new THREE.Vector3(
-            0.1 + Math.random() * 0.05, // Consistent forward movement
-            (Math.random() - 0.5) * spread, // Limited vertical spread
-            (Math.random() - 0.5) * spread  // Limited depth spread
+            ntProperties.speed + Math.random() * 0.05,
+            (Math.random() - 0.5) * spread,
+            (Math.random() - 0.5) * spread
         );
     }
 
@@ -170,6 +227,9 @@ class NeuronSimulation {
             inhibitBtn.addEventListener('click', () => {
                 this.toggleReuptakeInhibition();
             });
+
+            this.maoEnzymes = [];
+            this.createMAOEnzymes();
         } catch (error) {
             console.error('Error in constructor:', error);
         }
@@ -481,12 +541,23 @@ class NeuronSimulation {
         this.checkBinding();
         this.checkReuptake(); // Add reuptake check
 
+        this.updateEffects();
         this.renderer.render(this.scene, this.camera);
+
+        // Animate MAO enzymes
+        this.maoEnzymes.forEach(enzyme => {
+            enzyme.userData.phase += 0.02;
+            const wobble = Math.sin(enzyme.userData.phase) * 0.2;
+            enzyme.position.copy(enzyme.userData.originalPos)
+                .add(new THREE.Vector3(wobble, wobble, wobble));
+        });
+        
+        this.checkDegradation();
     }
 
     createSynapticStructure() {
         // Create axon terminal (bulb-like structure as shown in diagram)
-        const terminalGeometry = new THREE.SphereGeometry(2.5, 32, 32);
+        const terminalGeometry = new THREE.SphereGeometry(2.5, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.7);
         const neuronMaterial = new THREE.MeshPhongMaterial({
             color: 0xffcc88, // More yellow/orange like in diagram
             transparent: true,
@@ -495,6 +566,10 @@ class NeuronSimulation {
         });
         this.axonTerminal = new THREE.Mesh(terminalGeometry, neuronMaterial);
         this.axonTerminal.position.x = -5;
+        
+        // Add flow particles in terminal
+        this.createAxonalFlow();
+        
         this.scene.add(this.axonTerminal);
 
         // Create dendrite terminal (receiving end)
@@ -693,35 +768,185 @@ class NeuronSimulation {
     }
 
     checkReuptake() {
-        if (this.reuptakeInhibited) return; // Skip reuptake if inhibited
+        if (this.reuptakeInhibited) return;
 
         this.neurotransmitters.forEach(nt => {
             if (!nt.bound && !nt.reuptaking) {
-                this.transporters.forEach(transporter => {
-                    const distance = nt.mesh.position.distanceTo(transporter.position);
-                    if (distance < 0.5) {
-                        nt.reuptaking = true;
-                        
-                        // Animate reuptake with visual effects
+                // Use type-specific reuptake rate
+                if (Math.random() < nt.properties.reuptakeRate) {
+                    this.transporters.forEach(transporter => {
+                        const distance = nt.mesh.position.distanceTo(transporter.position);
+                        if (distance < 0.5) {
+                            nt.reuptaking = true;
+                            
+                            // Animate reuptake with visual effects
+                            const startPos = nt.mesh.position.clone();
+                            const targetPos = transporter.position.clone();
+                            const startScale = nt.mesh.scale.clone();
+                            
+                            const animate = (progress) => {
+                                if (progress <= 1) {
+                                    nt.mesh.position.lerpVectors(startPos, targetPos, progress);
+                                    
+                                    // Scale and color transition during reuptake
+                                    const scale = 1 - (progress * 0.8);
+                                    nt.mesh.scale.setScalar(scale);
+                                    
+                                    const color = new THREE.Color();
+                                    color.lerpColors(
+                                        new THREE.Color(0x4444ff),
+                                        new THREE.Color(0x222222),
+                                        progress
+                                    );
+                                    nt.mesh.material.color = color;
+                                    
+                                    requestAnimationFrame(() => animate(progress + 0.02));
+                                } else {
+                                    this.scene.remove(nt.mesh);
+                                    this.neurotransmitters = this.neurotransmitters.filter(n => n !== nt);
+                                }
+                            };
+                            
+                            animate(0);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    updateEffects() {
+        const effects = document.getElementById('effects');
+        const activeNTs = new Set(this.neurotransmitters.map(nt => nt.type));
+        
+        let effectText = '';
+        activeNTs.forEach(type => {
+            const properties = NEUROTRANSMITTER_TYPES[type];
+            effectText += `<p><strong>${properties.name}:</strong> ${properties.description}</p>`;
+        });
+        
+        effects.innerHTML = effectText || 'No active neurotransmitters';
+    }
+
+    createStorageVesicle(position, type) {
+        const vesicle = new StorageVesicle(position);
+        const ntProperties = NEUROTRANSMITTER_TYPES[type];
+        
+        // Update vesicle color based on neurotransmitter type
+        vesicle.mesh.material.color.setHex(ntProperties.color);
+        vesicle.mesh.material.opacity = 0.6;
+        
+        // Update stored neurotransmitter colors
+        vesicle.storedNeurotransmitters.forEach(nt => {
+            nt.material.color.setHex(ntProperties.color);
+            nt.material.emissive.setHex(ntProperties.color);
+            nt.material.emissiveIntensity = 0.2;
+        });
+        
+        return vesicle;
+    }
+
+    createAxonalFlow() {
+        const flowParticles = new THREE.Group();
+        const particleCount = 20;
+        const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+        const particleMaterial = new THREE.MeshPhongMaterial({
+            color: 0x88aaff,
+            transparent: true,
+            opacity: 0.6
+        });
+
+        for (let i = 0; i < particleCount; i++) {
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.userData.speed = 0.02 + Math.random() * 0.02;
+            particle.userData.phase = Math.random() * Math.PI * 2;
+            flowParticles.add(particle);
+        }
+
+        this.axonalFlow = flowParticles;
+        this.axonTerminal.add(flowParticles);
+
+        // Animate flow particles
+        const animateFlow = () => {
+            flowParticles.children.forEach(particle => {
+                particle.userData.phase += particle.userData.speed;
+                
+                // Create flowing motion along axon terminal
+                particle.position.set(
+                    Math.cos(particle.userData.phase) * 1.5,
+                    Math.sin(particle.userData.phase) * 1.5,
+                    Math.sin(particle.userData.phase * 0.5) * 0.5
+                );
+            });
+            
+            requestAnimationFrame(animateFlow);
+        };
+        
+        animateFlow();
+    }
+
+    createMAOEnzymes() {
+        const enzymeCount = 15;
+        const enzymeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+        const enzymeMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff6666,
+            transparent: true,
+            opacity: 0.7,
+            emissive: 0xff4444,
+            emissiveIntensity: 0.3
+        });
+
+        for (let i = 0; i < enzymeCount; i++) {
+            const enzyme = new THREE.Mesh(enzymeGeometry, enzymeMaterial);
+            
+            // Position enzymes around synaptic area
+            const angle = (i / enzymeCount) * Math.PI * 2;
+            const radius = 3 + Math.random();
+            const height = Math.random() * 2 - 1;
+            
+            enzyme.position.set(
+                0,
+                Math.sin(angle) * radius,
+                Math.cos(angle) * radius
+            );
+            
+            enzyme.userData.originalPos = enzyme.position.clone();
+            enzyme.userData.phase = Math.random() * Math.PI * 2;
+            
+            this.maoEnzymes.push(enzyme);
+            this.scene.add(enzyme);
+        }
+    }
+
+    checkDegradation() {
+        this.neurotransmitters.forEach(nt => {
+            if (!nt.bound && !nt.reuptaking && nt.properties.maoSensitive) {
+                this.maoEnzymes.forEach(enzyme => {
+                    const distance = nt.mesh.position.distanceTo(enzyme.position);
+                    
+                    if (distance < 0.5 && Math.random() < nt.properties.degradationRate) {
+                        // Animate degradation
                         const startPos = nt.mesh.position.clone();
-                        const targetPos = transporter.position.clone();
-                        const startScale = nt.mesh.scale.clone();
+                        const startColor = new THREE.Color(nt.properties.color);
                         
                         const animate = (progress) => {
                             if (progress <= 1) {
-                                nt.mesh.position.lerpVectors(startPos, targetPos, progress);
-                                
-                                // Scale and color transition during reuptake
-                                const scale = 1 - (progress * 0.8);
-                                nt.mesh.scale.setScalar(scale);
+                                // Fade out and break apart effect
+                                nt.mesh.scale.setScalar(1 - progress * 0.8);
                                 
                                 const color = new THREE.Color();
                                 color.lerpColors(
-                                    new THREE.Color(0x4444ff),
+                                    startColor,
                                     new THREE.Color(0x222222),
                                     progress
                                 );
                                 nt.mesh.material.color = color;
+                                nt.mesh.material.opacity = 1 - progress;
+                                
+                                // Create breakdown particles
+                                if (progress % 0.2 < 0.02) {
+                                    this.createDegradationParticle(nt.mesh.position);
+                                }
                                 
                                 requestAnimationFrame(() => animate(progress + 0.02));
                             } else {
@@ -735,6 +960,40 @@ class NeuronSimulation {
                 });
             }
         });
+    }
+
+    createDegradationParticle(position) {
+        const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+        const particleMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff4444,
+            transparent: true,
+            opacity: 0.5
+        });
+        
+        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+        particle.position.copy(position);
+        
+        // Add random velocity
+        const velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.1,
+            (Math.random() - 0.5) * 0.1,
+            (Math.random() - 0.5) * 0.1
+        );
+        
+        this.scene.add(particle);
+        
+        // Animate particle
+        const animate = (progress) => {
+            if (progress <= 1) {
+                particle.position.add(velocity);
+                particle.material.opacity = 0.5 * (1 - progress);
+                requestAnimationFrame(() => animate(progress + 0.05));
+            } else {
+                this.scene.add(particle);
+            }
+        };
+        
+        animate(0);
     }
 }
 
