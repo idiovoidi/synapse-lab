@@ -5,23 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neurotransmitter Simulation</title>
     <style>
-        canvas {
-            border: 1px solid #000;
-            display: block;
-            margin: 20px auto;
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
         }
         .controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
             text-align: center;
-            margin: 10px;
+            z-index: 100;
+        }
+        button, select {
+            background: #333;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 8px 15px;
+            border-radius: 4px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #444;
         }
     </style>
 </head>
 <body>
-    <canvas id="neuronCanvas"></canvas>
+    <div id="info">
+        <h2>Neurotransmitter Simulation</h2>
+        <p>Blue: Excitatory | Green: Inhibitory</p>
+    </div>
+    
     <div class="controls">
+        <select id="ntType">
+            <option value="excitatory">Excitatory (Glutamate)</option>
+            <option value="inhibitory">Inhibitory (GABA)</option>
+        </select>
         <button id="releaseBtn">Release Neurotransmitters</button>
         <button id="resetBtn">Reset</button>
     </div>
-    <script src="simulation.js"></script>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js"
+        }
+    }
+    </script>
+    <script type="module" src="simulation.js"></script>
 </body>
 </html> 
