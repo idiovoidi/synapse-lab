@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { EmotionalFace } from './emotionalFace.js';
 
 const NEUROTRANSMITTER_TYPES = {
     DOPAMINE: {
@@ -173,6 +174,7 @@ class NeuronSimulation {
             // Initialize properties
             this.neurotransmitters = [];
             this.receptors = [];
+            this.vesicles = [];
             
             // Setup scene
             this.scene = new THREE.Scene();
@@ -192,6 +194,15 @@ class NeuronSimulation {
             this.renderer = new THREE.WebGLRenderer({ antialias: true });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(this.renderer.domElement);
+
+            // Create emotional face first, before any animations start
+            try {
+                this.emotionalFace = new EmotionalFace();
+                console.log('Emotional face created successfully');
+            } catch (error) {
+                console.error('Error creating emotional face:', error);
+                this.emotionalFace = null;
+            }
 
             // Add lights
             const ambientLight = new THREE.AmbientLight(0x404040);
@@ -826,6 +837,15 @@ class NeuronSimulation {
         });
         
         effects.innerHTML = effectText || 'No active neurotransmitters';
+        
+        // Update emotional face if it exists
+        if (this.emotionalFace) {
+            try {
+                this.emotionalFace.updateExpression(this.neurotransmitters);
+            } catch (error) {
+                console.error('Error updating emotional face:', error);
+            }
+        }
     }
 
     createStorageVesicle(position, type) {
