@@ -158,6 +158,18 @@ class NeuronSimulation {
             this.animate();
 
             console.log('Scene setup complete');
+
+            this.reuptakeInhibited = false; // Track reuptake inhibition state
+            
+            // Add reuptake inhibition toggle button
+            const inhibitBtn = document.createElement('button');
+            inhibitBtn.id = 'inhibitBtn';
+            inhibitBtn.textContent = 'Toggle Reuptake Inhibition';
+            document.querySelector('.controls').appendChild(inhibitBtn);
+            
+            inhibitBtn.addEventListener('click', () => {
+                this.toggleReuptakeInhibition();
+            });
         } catch (error) {
             console.error('Error in constructor:', error);
         }
@@ -491,16 +503,24 @@ class NeuronSimulation {
         this.dendrite.position.x = 5;
         this.scene.add(this.dendrite);
 
-        // Create synaptic cleft (narrower gap as shown in diagram)
-        const cleftGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.5, 32);
+        // Create more detailed synaptic cleft
+        const cleftGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.8, 32, 5, true);
         const cleftMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffffff,
+            color: 0xaaaaff,
             transparent: true,
-            opacity: 0.1
+            opacity: 0.1,
+            side: THREE.DoubleSide,
+            wireframe: true
         });
         this.synapticCleft = new THREE.Mesh(cleftGeometry, cleftMaterial);
         this.synapticCleft.rotation.z = Math.PI / 2;
         this.scene.add(this.synapticCleft);
+
+        // Add extracellular matrix elements in the cleft
+        this.createExtracellularMatrix();
+
+        // Create adhesion molecules connecting pre and post synaptic membranes
+        this.createAdhesionMolecules();
 
         // Add reuptake transporters
         this.createReuptakeTransporters();
@@ -606,22 +626,103 @@ class NeuronSimulation {
         createLipidLayer(3, false);
     }
 
-    // Add reuptake functionality
+    createExtracellularMatrix() {
+        const matrixGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+        const matrixMaterial = new THREE.MeshPhongMaterial({
+            color: 0x88aaff,
+            transparent: true,
+            opacity: 0.3
+        });
+
+        // Add matrix proteins throughout the cleft
+        for (let i = 0; i < 50; i++) {
+            const matrix = new THREE.Mesh(matrixGeometry, matrixMaterial);
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * 2;
+            
+            matrix.position.set(
+                Math.random() * 0.8 - 0.4,
+                Math.sin(angle) * radius,
+                Math.cos(angle) * radius
+            );
+            
+            this.synapticCleft.add(matrix);
+        }
+    }
+
+    createAdhesionMolecules() {
+        const adhesionGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
+        const adhesionMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff88aa,
+            transparent: true,
+            opacity: 0.5
+        });
+
+        // Create adhesion molecules around the cleft periphery
+        for (let i = 0; i < 8; i++) {
+            const adhesion = new THREE.Mesh(adhesionGeometry, adhesionMaterial);
+            const angle = (i / 8) * Math.PI * 2;
+            const radius = 2.3;
+            
+            adhesion.position.set(
+                0,
+                Math.sin(angle) * radius,
+                Math.cos(angle) * radius
+            );
+            
+            this.synapticCleft.add(adhesion);
+        }
+    }
+
+    toggleReuptakeInhibition() {
+        this.reuptakeInhibited = !this.reuptakeInhibited;
+        
+        // Visual feedback for inhibition state
+        this.transporters.forEach(transporter => {
+            transporter.material.color.setHex(
+                this.reuptakeInhibited ? 0xff0000 : 0xff9933
+            );
+            transporter.material.opacity = this.reuptakeInhibited ? 0.4 : 0.8;
+        });
+
+        // Update button appearance
+        const inhibitBtn = document.getElementById('inhibitBtn');
+        inhibitBtn.style.backgroundColor = this.reuptakeInhibited ? '#ff4444' : '#333';
+        inhibitBtn.textContent = this.reuptakeInhibited ? 
+            'Reuptake Inhibited' : 'Toggle Reuptake Inhibition';
+    }
+
     checkReuptake() {
+        if (this.reuptakeInhibited) return; // Skip reuptake if inhibited
+
         this.neurotransmitters.forEach(nt => {
             if (!nt.bound && !nt.reuptaking) {
                 this.transporters.forEach(transporter => {
                     const distance = nt.mesh.position.distanceTo(transporter.position);
                     if (distance < 0.5) {
                         nt.reuptaking = true;
-                        // Animate reuptake
+                        
+                        // Animate reuptake with visual effects
                         const startPos = nt.mesh.position.clone();
                         const targetPos = transporter.position.clone();
+                        const startScale = nt.mesh.scale.clone();
                         
                         const animate = (progress) => {
                             if (progress <= 1) {
                                 nt.mesh.position.lerpVectors(startPos, targetPos, progress);
-                                nt.mesh.scale.multiplyScalar(0.98); // Shrink during reuptake
+                                
+                                // Scale and color transition during reuptake
+                                const scale = 1 - (progress * 0.8);
+                                nt.mesh.scale.setScalar(scale);
+                                
+                                const color = new THREE.Color();
+                                color.lerpColors(
+                                    new THREE.Color(0x4444ff),
+                                    new THREE.Color(0x222222),
+                                    progress
+                                );
+                                nt.mesh.material.color = color;
+                                
                                 requestAnimationFrame(() => animate(progress + 0.02));
                             } else {
                                 this.scene.remove(nt.mesh);
