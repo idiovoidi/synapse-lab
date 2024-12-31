@@ -481,19 +481,25 @@ class NeuronSimulation {
 
     releaseNeurotransmitters() {
         const type = document.getElementById('ntType').value;
-        const releasePattern = this.determineReleasePattern(type);
         
-        switch(releasePattern) {
-            case 'burst':
-                this.burstRelease(type);
-                break;
-            case 'single':
-                this.singleVesicleRelease(type);
-                break;
-            case 'continuous':
-                this.startContinuousRelease(type);
-                break;
-        }
+        // Trigger action potential first
+        this.simulateActionPotential();
+        
+        // Delay neurotransmitter release until calcium channels open
+        setTimeout(() => {
+            const releasePattern = this.determineReleasePattern(type);
+            switch(releasePattern) {
+                case 'burst':
+                    this.burstRelease(type);
+                    break;
+                case 'single':
+                    this.singleVesicleRelease(type);
+                    break;
+                case 'continuous':
+                    this.startContinuousRelease(type);
+                    break;
+            }
+        }, 500); // Delay to match calcium channel opening
     }
 
     determineReleasePattern(type) {
@@ -698,7 +704,10 @@ class NeuronSimulation {
         this.axonTerminal.position.set(-5, 0, -1);
         this.scene.add(this.axonTerminal);
 
-        // Create vesicle pool regions
+        // Add voltage-gated calcium channels
+        this.createVoltageGatedChannels();
+
+        // Create vesicle pool regions with distinct zones
         this.createVesiclePoolRegions();
         
         // Add flow particles in terminal
@@ -708,6 +717,19 @@ class NeuronSimulation {
         this.createPostsynapticDensity();
 
         // Create more detailed synaptic cleft with proper spacing
+        this.createDetailedSynapticCleft();
+
+        // Add extracellular matrix elements in the cleft
+        this.createExtracellularMatrix();
+
+        // Create adhesion molecules with proper spacing
+        this.createAdhesionMolecules();
+
+        // Add reuptake transporters with proper distribution
+        this.createReuptakeTransporters();
+    }
+
+    createDetailedSynapticCleft() {
         const cleftWidth = 0.04; // 40 nanometers in scene units
         const cleftGeometry = new THREE.BoxGeometry(5, cleftWidth, 4);
         const cleftMaterial = new THREE.MeshPhongMaterial({
@@ -720,17 +742,208 @@ class NeuronSimulation {
         this.synapticCleft.position.set(0, 0, 0);
         this.scene.add(this.synapticCleft);
 
-        // Add extracellular matrix elements in the cleft
-        this.createExtracellularMatrix();
+        // Add ion concentration visualization
+        this.createIonConcentrationField();
+    }
 
-        // Create adhesion molecules with proper spacing
-        this.createAdhesionMolecules();
+    createVoltageGatedChannels() {
+        const channelCount = 12;
+        const channelGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8);
+        const channelMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff4444,
+            transparent: true,
+            opacity: 0.7,
+            emissive: 0xff0000,
+            emissiveIntensity: 0.3
+        });
 
-        // Add reuptake transporters with proper distribution
-        this.createReuptakeTransporters();
+        this.voltageGatedChannels = [];
 
-        // Create calcium channels
-        this.createCalciumChannels();
+        for (let i = 0; i < channelCount; i++) {
+            const channel = new THREE.Mesh(channelGeometry, channelMaterial.clone());
+            const angle = (i / channelCount) * Math.PI * 2;
+            const radius = 1.8;
+            channel.position.set(
+                Math.cos(angle) * radius - 3.5,
+                0,
+                Math.sin(angle) * radius
+            );
+            channel.rotation.x = Math.PI / 2;
+            channel.userData.isOpen = false;
+            channel.userData.activationThreshold = 0.7 + Math.random() * 0.2;
+            this.voltageGatedChannels.push(channel);
+            this.axonTerminal.add(channel);
+        }
+    }
+
+    createIonConcentrationField() {
+        const particleCount = 100;
+        const particleGeometry = new THREE.SphereGeometry(0.02, 4, 4);
+        
+        // Create sodium ions (Na+)
+        const sodiumMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff8844,
+            transparent: true,
+            opacity: 0.6
+        });
+        this.sodiumIons = new THREE.Group();
+        
+        // Create calcium ions (Ca2+)
+        const calciumMaterial = new THREE.MeshPhongMaterial({
+            color: 0x44ff44,
+            transparent: true,
+            opacity: 0.6
+        });
+        this.calciumIons = new THREE.Group();
+
+        for (let i = 0; i < particleCount; i++) {
+            const sodiumIon = new THREE.Mesh(particleGeometry, sodiumMaterial);
+            const calciumIon = new THREE.Mesh(particleGeometry, calciumMaterial);
+            
+            // Position ions randomly in the cleft
+            this.positionIonInCleft(sodiumIon);
+            this.positionIonInCleft(calciumIon);
+            
+            this.sodiumIons.add(sodiumIon);
+            this.calciumIons.add(calciumIon);
+        }
+
+        this.synapticCleft.add(this.sodiumIons);
+        this.synapticCleft.add(this.calciumIons);
+    }
+
+    positionIonInCleft(ion) {
+        ion.position.set(
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 0.03,
+            (Math.random() - 0.5) * 3
+        );
+        ion.userData.velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.01,
+            (Math.random() - 0.5) * 0.01,
+            (Math.random() - 0.5) * 0.01
+        );
+    }
+
+    simulateActionPotential() {
+        const duration = 2000; // 2 seconds for full action potential
+        const startTime = Date.now();
+        let phase = 'depolarization';
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / duration;
+            
+            if (progress <= 1) {
+                // Update membrane potential visualization
+                const voltage = this.calculateMembranePotential(progress, phase);
+                this.updateChannelStates(voltage);
+                this.updateIonConcentrations(voltage);
+                
+                // Determine phase transitions
+                if (progress > 0.2 && phase === 'depolarization') {
+                    phase = 'repolarization';
+                } else if (progress > 0.6 && phase === 'repolarization') {
+                    phase = 'hyperpolarization';
+                }
+                
+                requestAnimationFrame(animate);
+            }
+        };
+        
+        animate();
+    }
+
+    calculateMembranePotential(progress, phase) {
+        switch(phase) {
+            case 'depolarization':
+                return -70 + (progress * 5 * 100); // -70mV to +30mV
+            case 'repolarization':
+                return 30 - (progress * 3 * 100); // +30mV to -70mV
+            case 'hyperpolarization':
+                return -70 - (progress * 20); // -70mV to -90mV
+            default:
+                return -70; // Resting potential
+        }
+    }
+
+    updateChannelStates(voltage) {
+        this.voltageGatedChannels.forEach(channel => {
+            const shouldBeOpen = voltage >= channel.userData.activationThreshold;
+            if (shouldBeOpen !== channel.userData.isOpen) {
+                channel.userData.isOpen = shouldBeOpen;
+                channel.material.emissiveIntensity = shouldBeOpen ? 0.8 : 0.3;
+                
+                if (shouldBeOpen) {
+                    // Trigger calcium influx when channel opens
+                    this.triggerCalciumInflux(channel.position);
+                }
+            }
+        });
+    }
+
+    triggerCalciumInflux(position) {
+        const particleCount = 5;
+        const particleGeometry = new THREE.SphereGeometry(0.03, 4, 4);
+        const particleMaterial = new THREE.MeshPhongMaterial({
+            color: 0x44ff44,
+            transparent: true,
+            opacity: 0.8,
+            emissive: 0x22ff22
+        });
+
+        for (let i = 0; i < particleCount; i++) {
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.copy(position);
+            
+            const velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.1,
+                (Math.random() - 0.5) * 0.1,
+                (Math.random() - 0.5) * 0.1
+            );
+            
+            this.scene.add(particle);
+            
+            const animate = (progress) => {
+                if (progress <= 1) {
+                    particle.position.add(velocity);
+                    particle.material.opacity = 0.8 * (1 - progress);
+                    requestAnimationFrame(() => animate(progress + 0.02));
+                } else {
+                    this.scene.remove(particle);
+                }
+            };
+            
+            animate(0);
+        }
+    }
+
+    updateIonConcentrations(voltage) {
+        // Update sodium ion movement
+        this.sodiumIons.children.forEach(ion => {
+            ion.position.add(ion.userData.velocity);
+            
+            // Keep ions within cleft bounds
+            if (Math.abs(ion.position.x) > 2) ion.userData.velocity.x *= -1;
+            if (Math.abs(ion.position.y) > 0.015) ion.userData.velocity.y *= -1;
+            if (Math.abs(ion.position.z) > 1.5) ion.userData.velocity.z *= -1;
+            
+            // Adjust velocity based on voltage
+            ion.userData.velocity.multiplyScalar(0.98); // Damping
+            ion.userData.velocity.y += voltage * 0.0001; // Voltage influence
+        });
+
+        // Update calcium ion movement similarly
+        this.calciumIons.children.forEach(ion => {
+            ion.position.add(ion.userData.velocity);
+            
+            if (Math.abs(ion.position.x) > 2) ion.userData.velocity.x *= -1;
+            if (Math.abs(ion.position.y) > 0.015) ion.userData.velocity.y *= -1;
+            if (Math.abs(ion.position.z) > 1.5) ion.userData.velocity.z *= -1;
+            
+            ion.userData.velocity.multiplyScalar(0.98);
+            ion.userData.velocity.y += voltage * 0.0002; // Calcium more sensitive to voltage
+        });
     }
 
     createVesiclePoolRegions() {
