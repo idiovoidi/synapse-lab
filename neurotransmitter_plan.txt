@@ -1,0 +1,160 @@
+NEUROTRANSMITTER SIMULATION - FUNCTIONAL OVERVIEW
+===============================================
+
+1. NEUROTRANSMITTER TYPES AND PRIMARY FUNCTIONS
+---------------------------------------------
+DOPAMINE
+- Function: Reward and pleasure signaling
+- Effects: 
+  * Increases happiness level
+  * Moderately increases arousal
+  * Associated with reward-seeking behavior
+- Interactions:
+  * Enhanced by norepinephrine
+  * Regulated by GABA
+  * MAO sensitive (degraded by MAO)
+
+SEROTONIN
+- Function: Mood and emotional regulation
+- Effects:
+  * Increases happiness level
+  * Decreases anxiety
+  * Stabilizes mood
+- Interactions:
+  * Balanced by GABA
+  * MAO sensitive
+  * Can be depleted by excessive release
+
+GLUTAMATE
+- Function: Primary excitatory neurotransmitter
+- Effects:
+  * Increases neural activity
+  * Enhances signal strength
+  * Critical for learning/memory
+- Interactions:
+  * Counterbalanced by GABA
+  * Not MAO sensitive
+  * Rapid reuptake system
+
+GABA
+- Function: Primary inhibitory neurotransmitter
+- Effects:
+  * Decreases anxiety
+  * Reduces arousal
+  * Calming effect
+- Interactions:
+  * Counteracts glutamate
+  * Not MAO sensitive
+  * Modulates other neurotransmitter effects
+
+NOREPINEPHRINE
+- Function: Arousal and attention
+- Effects:
+  * Increases arousal significantly
+  * Moderate anxiety increase
+  * Enhances alertness
+- Interactions:
+  * Enhances dopamine effects
+  * MAO sensitive
+  * Can be inhibited by GABA
+
+2. REUPTAKE AND DEGRADATION MECHANISMS
+------------------------------------
+MAO (Monoamine Oxidase) Degradation:
+- Affects: Dopamine, Serotonin, Norepinephrine
+- Degradation Rates:
+  * Dopamine: 60%
+  * Serotonin: 70%
+  * Norepinephrine: 65%
+
+Reuptake Systems:
+- Specific transporters for each type
+- Reuptake Rates:
+  * Dopamine: 80%
+  * Serotonin: 70%
+  * Glutamate: 90%
+  * GABA: 60%
+  * Norepinephrine: 75%
+
+3. EMOTIONAL EFFECTS AND VISUALIZATION
+-----------------------------------
+Happiness Level:
+- Dopamine: +0.3
+- Serotonin: +0.2
+- GABA: Neutral
+- Glutamate: Neutral
+- Norepinephrine: Neutral
+
+Arousal Level:
+- Dopamine: +0.2
+- Norepinephrine: +0.3
+- GABA: -0.2
+- Glutamate: +0.1
+- Serotonin: Neutral
+
+Anxiety Level:
+- Norepinephrine: +0.2
+- Serotonin: -0.3
+- GABA: -0.2
+- Dopamine: Neutral
+- Glutamate: +0.1
+
+4. VISUAL REPRESENTATION CHARACTERISTICS
+-------------------------------------
+Color Coding:
+- Dopamine: Purple (0x9933ff)
+- Serotonin: Orange (0xff9933)
+- Glutamate: Blue (0x4444ff)
+- GABA: Green (0x44ff44)
+- Norepinephrine: Red (0xff4444)
+
+Particle Characteristics:
+- Size variations based on type
+- Movement speed differences
+- Emission effects
+- Degradation animations
+
+5. INTERACTION RULES
+------------------
+Synergistic Effects:
+- Dopamine + Norepinephrine = Enhanced reward response
+- GABA + Serotonin = Enhanced anxiety reduction
+- Glutamate + Norepinephrine = Enhanced learning potential
+
+Antagonistic Effects:
+- GABA vs Glutamate
+- Serotonin vs Norepinephrine (anxiety effects)
+- GABA vs Norepinephrine
+
+6. SIMULATION PARAMETERS
+----------------------
+Release Patterns:
+- Burst release (multiple vesicles)
+- Single vesicle release
+- Continuous low-level release
+
+Environmental Factors:
+- Reuptake inhibition effects
+- MAO inhibition effects
+- Receptor sensitivity/desensitization
+
+7. FUTURE ENHANCEMENTS
+--------------------
+Planned Features:
+- Receptor density changes
+- Long-term potentiation
+- Neurotransmitter synthesis visualization
+- Vesicle recycling mechanics
+- Second messenger systems
+- Gene expression effects
+- Protein synthesis visualization
+- Synaptic plasticity
+
+8. EDUCATIONAL COMPONENTS
+-----------------------
+Learning Objectives:
+- Neurotransmitter function understanding
+- Synaptic transmission mechanics
+- Drug interaction effects
+- Mental health implications
+- Neuroplasticity concepts 

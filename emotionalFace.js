@@ -2,180 +2,130 @@ import * as THREE from 'three';
 
 class EmotionalFace {
     constructor() {
-        try {
-            // Create face scene
-            this.scene = new THREE.Scene();
-            this.camera = new THREE.PerspectiveCamera(
-                75,
-                window.innerWidth * 0.2 / (window.innerHeight * 0.2),
-                0.1,
-                1000
-            );
-            
-            this.renderer = new THREE.WebGLRenderer({ 
-                antialias: true,
-                alpha: true 
-            });
-            this.renderer.setSize(window.innerWidth * 0.2, window.innerHeight * 0.2);
-            
-            // Position the face renderer in top-right corner
-            const container = document.createElement('div');
-            container.style.position = 'absolute';
-            container.style.top = '20px';
-            container.style.right = '20px';
-            container.style.zIndex = '100';
-            container.appendChild(this.renderer.domElement);
-            document.body.appendChild(container);
+        // Create face container
+        this.container = new THREE.Group();
+        this.container.position.set(20, 10, 0);
+        this.container.scale.set(0.5, 0.5, 0.5);
 
-            this.camera.position.z = 5;
-            
-            // Initialize face parts
-            this.createFace();
-            
-            // Start with neutral expression
-            this.currentMood = {
-                happiness: 0,
-                arousal: 0,
-                anxiety: 0
-            };
-            
-            this.animate();
-            console.log('EmotionalFace initialized successfully');
-        } catch (error) {
-            console.error('Error initializing EmotionalFace:', error);
-            throw error;
-        }
-    }
-
-    createFace() {
-        // Create head
-        const headGeometry = new THREE.CircleGeometry(2, 32);
-        const headMaterial = new THREE.MeshBasicMaterial({ 
+        // Create face base
+        const faceGeometry = new THREE.CircleGeometry(2, 32);
+        const faceMaterial = new THREE.MeshPhongMaterial({
             color: 0xffdbac,
-            side: THREE.DoubleSide 
+            side: THREE.DoubleSide
         });
-        this.head = new THREE.Mesh(headGeometry, headMaterial);
-        this.scene.add(this.head);
+        this.face = new THREE.Mesh(faceGeometry, faceMaterial);
+        this.container.add(this.face);
 
         // Create eyes
         const eyeGeometry = new THREE.CircleGeometry(0.3, 32);
-        const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        
-        this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.leftEye.position.set(-0.8, 0.3, 0.1);
-        
-        this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.rightEye.position.set(0.8, 0.3, 0.1);
-        
-        this.scene.add(this.leftEye);
-        this.scene.add(this.rightEye);
-
-        // Create mouth (will be animated)
-        const mouthGeometry = new THREE.BufferGeometry();
-        const mouthCurve = new THREE.QuadraticBezierCurve(
-            new THREE.Vector2(-1, 0),
-            new THREE.Vector2(0, 0),
-            new THREE.Vector2(1, 0)
-        );
-        
-        const points = mouthCurve.getPoints(50);
-        const vertices = new Float32Array(points.length * 3);
-        
-        for (let i = 0; i < points.length; i++) {
-            vertices[i * 3] = points[i].x;
-            vertices[i * 3 + 1] = points[i].y;
-            vertices[i * 3 + 2] = 0;
-        }
-        
-        mouthGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-        
-        const mouthMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-        this.mouth = new THREE.Line(mouthGeometry, mouthMaterial);
-        this.mouth.position.set(0, -0.5, 0.1);
-        this.mouth.scale.set(0.8, 1, 1);
-        
-        this.scene.add(this.mouth);
-    }
-
-    updateExpression(neurotransmitters) {
-        if (!Array.isArray(neurotransmitters)) {
-            console.warn('Invalid neurotransmitters array provided');
-            return;
-        }
-
-        // Update mood based on neurotransmitter levels
-        this.currentMood = {
-            happiness: 0,
-            arousal: 0,
-            anxiety: 0
-        };
-
-        neurotransmitters.forEach(nt => {
-            if (!nt || !nt.type) {
-                console.warn('Invalid neurotransmitter object:', nt);
-                return;
-            }
-
-            switch(nt.type) {
-                case 'DOPAMINE':
-                    this.currentMood.happiness += 0.3;
-                    this.currentMood.arousal += 0.2;
-                    break;
-                case 'SEROTONIN':
-                    this.currentMood.happiness += 0.2;
-                    this.currentMood.anxiety -= 0.3;
-                    break;
-                case 'NOREPINEPHRINE':
-                    this.currentMood.arousal += 0.3;
-                    this.currentMood.anxiety += 0.2;
-                    break;
-                case 'GABA':
-                    this.currentMood.anxiety -= 0.2;
-                    this.currentMood.arousal -= 0.2;
-                    break;
-            }
+        const eyeMaterial = new THREE.MeshPhongMaterial({
+            color: 0x000000,
+            side: THREE.DoubleSide
         });
 
-        // Update facial features
-        this.updateMouth();
-        this.updateEyes();
+        this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        this.leftEye.position.set(-0.7, 0.3, 0.1);
+        this.container.add(this.leftEye);
+
+        this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        this.rightEye.position.set(0.7, 0.3, 0.1);
+        this.container.add(this.rightEye);
+
+        // Create mouth (will be updated based on emotion)
+        this.mouthGeometry = new THREE.BufferGeometry();
+        const mouthMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        this.mouth = new THREE.Line(this.mouthGeometry, mouthMaterial);
+        this.container.add(this.mouth);
+
+        // Set default emotion
+        this.setEmotion('neutral');
     }
 
-    updateMouth() {
-        // Create mouth curve based on happiness
-        const mouthCurve = new THREE.QuadraticBezierCurve(
-            new THREE.Vector2(-1, 0),
-            new THREE.Vector2(0, this.currentMood.happiness),
-            new THREE.Vector2(1, 0)
-        );
+    setEmotion(emotion) {
+        const mouthPoints = [];
         
-        const points = mouthCurve.getPoints(50);
-        const vertices = new Float32Array(points.length * 3);
-        
-        for (let i = 0; i < points.length; i++) {
-            vertices[i * 3] = points[i].x;
-            vertices[i * 3 + 1] = points[i].y;
-            vertices[i * 3 + 2] = 0;
+        switch(emotion) {
+            case 'happy':
+                mouthPoints.push(
+                    new THREE.Vector3(-1, -0.3, 0.1),
+                    new THREE.Vector3(0, -0.1, 0.1),
+                    new THREE.Vector3(1, -0.3, 0.1)
+                );
+                this.face.material.color.setHex(0xffdbac);
+                break;
+            case 'sad':
+                mouthPoints.push(
+                    new THREE.Vector3(-1, -0.5, 0.1),
+                    new THREE.Vector3(0, -0.7, 0.1),
+                    new THREE.Vector3(1, -0.5, 0.1)
+                );
+                this.face.material.color.setHex(0xffd0a0);
+                break;
+            case 'excited':
+                mouthPoints.push(
+                    new THREE.Vector3(-1, -0.2, 0.1),
+                    new THREE.Vector3(0, 0, 0.1),
+                    new THREE.Vector3(1, -0.2, 0.1)
+                );
+                this.face.material.color.setHex(0xffe4b5);
+                break;
+            case 'neutral':
+            default:
+                mouthPoints.push(
+                    new THREE.Vector3(-1, -0.4, 0.1),
+                    new THREE.Vector3(0, -0.4, 0.1),
+                    new THREE.Vector3(1, -0.4, 0.1)
+                );
+                this.face.material.color.setHex(0xffdbac);
+                break;
         }
-        
-        this.mouth.geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+        // Update mouth geometry
+        this.mouthGeometry.setFromPoints(mouthPoints);
     }
 
-    updateEyes() {
-        // Adjust eye size based on arousal
-        const baseScale = 1 + (this.currentMood.arousal * 0.3);
-        this.leftEye.scale.set(baseScale, baseScale, 1);
-        this.rightEye.scale.set(baseScale, baseScale, 1);
+    updateFromNeurotransmitters(neurotransmitters) {
+        try {
+            let dopamineCount = 0;
+            let serotoninCount = 0;
+            let norepinephrineCount = 0;
 
-        // Adjust eye position based on anxiety
-        const anxietyOffset = this.currentMood.anxiety * 0.2;
-        this.leftEye.position.y = 0.3 + anxietyOffset;
-        this.rightEye.position.y = 0.3 + anxietyOffset;
+            // Count bound neurotransmitters
+            neurotransmitters.forEach(nt => {
+                if (nt.bound) {
+                    switch(nt.type) {
+                        case 'DOPAMINE':
+                            dopamineCount++;
+                            break;
+                        case 'SEROTONIN':
+                            serotoninCount++;
+                            break;
+                        case 'NOREPINEPHRINE':
+                            norepinephrineCount++;
+                            break;
+                    }
+                }
+            });
+
+            // Determine emotion based on neurotransmitter levels
+            if (dopamineCount > 3) {
+                this.setEmotion('excited');
+            } else if (serotoninCount > 3) {
+                this.setEmotion('happy');
+            } else if (norepinephrineCount > 3) {
+                this.setEmotion('excited');
+            } else if (dopamineCount < 1 && serotoninCount < 1) {
+                this.setEmotion('sad');
+            } else {
+                this.setEmotion('neutral');
+            }
+        } catch (error) {
+            console.error('Error updating emotional face:', error);
+        }
     }
 
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        this.renderer.render(this.scene, this.camera);
+    getObject() {
+        return this.container;
     }
 }
 

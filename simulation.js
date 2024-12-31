@@ -1,172 +1,7 @@
 import * as THREE from 'three';
 import { EmotionalFace } from './emotionalFace.js';
-
-const NEUROTRANSMITTER_TYPES = {
-    DOPAMINE: {
-        name: 'Dopamine',
-        color: 0x9933ff, // Purple
-        speed: 0.12,
-        size: 0.25,
-        description: 'Reward and pleasure signaling',
-        reuptakeRate: 0.8,
-        maoSensitive: true,
-        degradationRate: 0.6
-    },
-    SEROTONIN: {
-        name: 'Serotonin',
-        color: 0xff9933, // Orange
-        speed: 0.1,
-        size: 0.22,
-        description: 'Mood and emotional regulation',
-        reuptakeRate: 0.7,
-        maoSensitive: true,
-        degradationRate: 0.7
-    },
-    GLUTAMATE: {
-        name: 'Glutamate',
-        color: 0x4444ff, // Blue
-        speed: 0.15,
-        size: 0.2,
-        description: 'Primary excitatory neurotransmitter',
-        reuptakeRate: 0.9,
-        maoSensitive: false,
-        degradationRate: 0.3
-    },
-    GABA: {
-        name: 'GABA',
-        color: 0x44ff44, // Green
-        speed: 0.08,
-        size: 0.23,
-        description: 'Primary inhibitory neurotransmitter',
-        reuptakeRate: 0.6,
-        maoSensitive: false,
-        degradationRate: 0.3
-    },
-    NOREPINEPHRINE: {
-        name: 'Norepinephrine',
-        color: 0xff4444, // Red
-        speed: 0.13,
-        size: 0.21,
-        description: 'Arousal and attention',
-        reuptakeRate: 0.75,
-        maoSensitive: true,
-        degradationRate: 0.65
-    }
-};
-
-class Neurotransmitter {
-    constructor(position, type) {
-        const ntProperties = NEUROTRANSMITTER_TYPES[type];
-        const geometry = new THREE.SphereGeometry(ntProperties.size, 16, 16);
-        const material = new THREE.MeshPhongMaterial({
-            color: ntProperties.color,
-            shininess: 100,
-            emissive: ntProperties.color,
-            emissiveIntensity: 0.2
-        });
-        
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.copy(position);
-        this.type = type;
-        this.properties = ntProperties;
-        this.bound = false;
-        this.reuptaking = false;
-
-        // Create more directed movement toward receptors
-        const targetX = 4;
-        const directionX = targetX - position.x;
-        const spread = 0.3;
-
-        this.velocity = new THREE.Vector3(
-            ntProperties.speed + Math.random() * 0.05,
-            (Math.random() - 0.5) * spread,
-            (Math.random() - 0.5) * spread
-        );
-    }
-
-    update() {
-        if (!this.bound && !this.reuptaking) {
-            // Add slight wavering motion while maintaining forward direction
-            this.velocity.y += (Math.random() - 0.5) * 0.01;
-            this.velocity.z += (Math.random() - 0.5) * 0.01;
-            
-            // Clamp vertical and depth movement to maintain focused path
-            this.velocity.y = THREE.MathUtils.clamp(this.velocity.y, -0.05, 0.05);
-            this.velocity.z = THREE.MathUtils.clamp(this.velocity.z, -0.05, 0.05);
-            
-            this.mesh.position.add(this.velocity);
-        }
-    }
-}
-
-class StorageVesicle {
-    constructor(position) {
-        // Create vesicle container
-        const vesicleGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-        const vesicleMaterial = new THREE.MeshPhongMaterial({
-            color: 0x99ccff,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
-        });
-        this.mesh = new THREE.Mesh(vesicleGeometry, vesicleMaterial);
-        this.mesh.position.copy(position);
-
-        // Create stored neurotransmitters
-        this.storedNeurotransmitters = [];
-        const ntCount = 6; // number of neurotransmitters per vesicle
-        const ntGeometry = new THREE.SphereGeometry(0.06, 8, 8);
-        const ntMaterial = new THREE.MeshPhongMaterial({
-            color: 0x6699ff
-        });
-
-        // Arrange neurotransmitters in a circular pattern inside vesicle
-        for (let i = 0; i < ntCount; i++) {
-            const nt = new THREE.Mesh(ntGeometry, ntMaterial);
-            const angle = (i / ntCount) * Math.PI * 2;
-            const radius = 0.15;
-            
-            nt.position.set(
-                Math.cos(angle) * radius,
-                Math.sin(angle) * radius,
-                0
-            );
-            
-            this.mesh.add(nt);
-            this.storedNeurotransmitters.push(nt);
-        }
-
-        this.isMoving = false;
-    }
-
-    moveToReleasePosition(targetPos, onComplete) {
-        if (this.isMoving) return;
-        
-        this.isMoving = true;
-        const startPos = this.mesh.position.clone();
-        const duration = 1000; // ms
-        const startTime = Date.now();
-
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Use easing function for smooth movement
-            const easeProgress = 1 - Math.pow(1 - progress, 3);
-            
-            this.mesh.position.lerpVectors(startPos, targetPos, easeProgress);
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                this.isMoving = false;
-                if (onComplete) onComplete();
-            }
-        };
-
-        animate();
-    }
-}
+import { Neurotransmitter, NEUROTRANSMITTER_TYPES } from './neurotransmitter.js';
+import { StorageVesicle } from './storageVesicle.js';
 
 class NeuronSimulation {
     constructor() {
@@ -175,6 +10,8 @@ class NeuronSimulation {
             this.neurotransmitters = [];
             this.receptors = [];
             this.vesicles = [];
+            this.transporters = [];
+            this.maoEnzymes = [];
             
             // Setup scene
             this.scene = new THREE.Scene();
@@ -193,16 +30,15 @@ class NeuronSimulation {
             // Setup renderer
             this.renderer = new THREE.WebGLRenderer({ antialias: true });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(this.renderer.domElement);
+            const container = document.getElementById('canvas-container');
+            container.appendChild(this.renderer.domElement);
 
-            // Create emotional face first, before any animations start
-            try {
-                this.emotionalFace = new EmotionalFace();
-                console.log('Emotional face created successfully');
-            } catch (error) {
-                console.error('Error creating emotional face:', error);
-                this.emotionalFace = null;
-            }
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            });
 
             // Add lights
             const ambientLight = new THREE.AmbientLight(0x404040);
@@ -212,6 +48,34 @@ class NeuronSimulation {
             mainLight.position.set(10, 10, 10);
             this.scene.add(mainLight);
 
+            // Create emotional face and add to scene
+            try {
+                this.emotionalFace = new EmotionalFace();
+                const faceObject = this.emotionalFace.getObject();
+                faceObject.position.set(20, 10, 0);
+                this.scene.add(faceObject);
+                console.log('Emotional face created and added to scene successfully');
+            } catch (error) {
+                console.error('Error creating emotional face:', error);
+                this.emotionalFace = null;
+            }
+
+            // Initialize state
+            this.reuptakeInhibited = false;
+            this.activeEffects = {
+                reward_enhancement: false,
+                anxiety_reduction: false,
+                learning_enhancement: false
+            };
+            
+            this.receptorSensitivity = {
+                DOPAMINE: 1.0,
+                SEROTONIN: 1.0,
+                GLUTAMATE: 1.0,
+                GABA: 1.0,
+                NOREPINEPHRINE: 1.0
+            };
+
             // Create neurons and receptors
             this.createNeurons();
             this.createReceptors();
@@ -219,88 +83,184 @@ class NeuronSimulation {
 
             // Create detailed synapse structure
             this.createSynapticStructure();
-            this.createVesicles();
-            this.createMembraneLipids();
+            this.createStorageVesicles();
+
+            // Create MAO enzymes
+            this.createMAOEnzymes();
+
+            // Add reuptake inhibition toggle button if it doesn't exist
+            if (!document.getElementById('inhibitBtn')) {
+                const inhibitBtn = document.createElement('button');
+                inhibitBtn.id = 'inhibitBtn';
+                inhibitBtn.textContent = 'Toggle Reuptake Inhibition';
+                document.querySelector('.controls').appendChild(inhibitBtn);
+                
+                inhibitBtn.addEventListener('click', () => {
+                    this.toggleReuptakeInhibition();
+                });
+            }
 
             // Start animation
             this.animate();
-
             console.log('Scene setup complete');
-
-            this.reuptakeInhibited = false; // Track reuptake inhibition state
-            
-            // Add reuptake inhibition toggle button
-            const inhibitBtn = document.createElement('button');
-            inhibitBtn.id = 'inhibitBtn';
-            inhibitBtn.textContent = 'Toggle Reuptake Inhibition';
-            document.querySelector('.controls').appendChild(inhibitBtn);
-            
-            inhibitBtn.addEventListener('click', () => {
-                this.toggleReuptakeInhibition();
-            });
-
-            this.maoEnzymes = [];
-            this.createMAOEnzymes();
         } catch (error) {
             console.error('Error in constructor:', error);
+            throw error; // Re-throw to see full stack trace
         }
     }
 
     createNeurons() {
-        // Create cell body (soma) for presynaptic neuron
-        const somaGeometry = new THREE.SphereGeometry(3, 32, 32);
+        // Create irregular cell body (soma) for presynaptic neuron
+        const somaGeometry = this.createIrregularSomaGeometry();
         const somaMaterial = new THREE.MeshPhongMaterial({
             color: 0xffcc88,
             transparent: true,
-            opacity: 0.9
+            opacity: 0.9,
+            roughness: 0.7,
+            metalness: 0.2
         });
+        
         this.preSoma = new THREE.Mesh(somaGeometry, somaMaterial);
         this.preSoma.position.set(-15, 0, 0);
         this.scene.add(this.preSoma);
 
-        // Create nucleus
-        const nucleusGeometry = new THREE.SphereGeometry(1, 24, 24);
+        // Add organelles
+        this.addCellOrganelles(this.preSoma);
+
+        // Create axon using a curved path
+        this.createAxon(-15, 0, 0, -5, 0, 0);
+
+        // Create complex dendrites for presynaptic neuron
+        this.createDendrites(this.preSoma, 8);
+
+        // Create postsynaptic neuron with different irregular shape
+        const postSomaGeometry = this.createIrregularSomaGeometry();
+        this.postSoma = new THREE.Mesh(postSomaGeometry, somaMaterial.clone());
+        this.postSoma.position.set(15, 0, 0);
+        this.scene.add(this.postSoma);
+
+        // Add organelles to postsynaptic neuron
+        this.addCellOrganelles(this.postSoma);
+
+        // Create dendrites for postsynaptic neuron
+        this.createDendrites(this.postSoma, 8);
+    }
+
+    createIrregularSomaGeometry() {
+        const baseRadius = 3;
+        const segments = 32;
+        const vertices = [];
+        const indices = [];
+        
+        // Create irregular sphere vertices
+        for (let i = 0; i <= segments; i++) {
+            const phi = (i * Math.PI) / segments;
+            const sinPhi = Math.sin(phi);
+            const cosPhi = Math.cos(phi);
+            
+            for (let j = 0; j <= segments; j++) {
+                const theta = (j * 2 * Math.PI) / segments;
+                const sinTheta = Math.sin(theta);
+                const cosTheta = Math.cos(theta);
+                
+                // Add random variation to radius
+                const variation = 1 + (Math.random() - 0.5) * 0.3;
+                const radius = baseRadius * variation;
+                
+                vertices.push(
+                    radius * sinPhi * cosTheta,
+                    radius * cosPhi,
+                    radius * sinPhi * sinTheta
+                );
+            }
+        }
+        
+        // Create faces
+        for (let i = 0; i < segments; i++) {
+            for (let j = 0; j < segments; j++) {
+                const first = i * (segments + 1) + j;
+                const second = first + segments + 1;
+                
+                indices.push(first, second, first + 1);
+                indices.push(second, second + 1, first + 1);
+            }
+        }
+        
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        
+        return geometry;
+    }
+
+    addCellOrganelles(soma) {
+        // Add nucleus
+        const nucleusGeometry = new THREE.SphereGeometry(1.2, 24, 24);
         const nucleusMaterial = new THREE.MeshPhongMaterial({
             color: 0x4444aa,
             transparent: true,
             opacity: 0.8
         });
         const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
-        this.preSoma.add(nucleus);
+        nucleus.position.y = 0.3; // Slightly offset from center
+        soma.add(nucleus);
 
-        // Create axon using a curved path
-        this.createAxon(-15, 0, 0, -5, 0, 0);
+        // Add mitochondria
+        const mitochondriaCount = 5;
+        const mitoGeometry = new THREE.CapsuleGeometry(0.2, 0.6, 4, 8);
+        const mitoMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff8866,
+            transparent: true,
+            opacity: 0.7
+        });
 
-        // Create dendrites for presynaptic neuron
-        this.createDendrites(this.preSoma, 6);
-
-        // Create postsynaptic neuron
-        this.postSoma = new THREE.Mesh(somaGeometry.clone(), somaMaterial.clone());
-        this.postSoma.position.set(15, 0, 0);
-        this.scene.add(this.postSoma);
-
-        // Add nucleus to postsynaptic neuron
-        const postNucleus = nucleus.clone();
-        this.postSoma.add(postNucleus);
-
-        // Create dendrites for postsynaptic neuron
-        this.createDendrites(this.postSoma, 6);
+        for (let i = 0; i < mitochondriaCount; i++) {
+            const mito = new THREE.Mesh(mitoGeometry, mitoMaterial);
+            const angle = (i / mitochondriaCount) * Math.PI * 2;
+            const radius = 1.5;
+            mito.position.set(
+                Math.cos(angle) * radius,
+                Math.sin(angle) * radius,
+                0
+            );
+            mito.rotation.z = Math.random() * Math.PI;
+            soma.add(mito);
+        }
     }
 
     createAxon(startX, startY, startZ, endX, endY, endZ) {
-        // Create control points for curved axon
-        const curve = new THREE.CubicBezierCurve3(
-            new THREE.Vector3(startX, startY, startZ),
-            new THREE.Vector3(startX + 5, startY + 2, startZ),
-            new THREE.Vector3(endX - 5, endY - 2, endZ),
-            new THREE.Vector3(endX, endY, endZ)
-        );
+        // Create more complex control points for twisted axon
+        const points = [];
+        const segments = 10;
+        const twistFactor = 0.8;
+        const branchProbability = 0.3;
 
-        // Create axon tube
-        const points = curve.getPoints(50);
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const x = startX + (endX - startX) * t;
+            const y = startY + (Math.sin(t * Math.PI * 2) * twistFactor);
+            const z = startZ + (Math.cos(t * Math.PI * 2) * twistFactor);
+            points.push(new THREE.Vector3(x, y, z));
+
+            // Add random branches
+            if (Math.random() < branchProbability && i > 2 && i < segments - 2) {
+                const branchLength = 1 + Math.random() * 2;
+                const branchAngle = Math.random() * Math.PI * 2;
+                const branchEnd = new THREE.Vector3(
+                    x + Math.cos(branchAngle) * branchLength,
+                    y + Math.sin(branchAngle) * branchLength,
+                    z + Math.sin(branchAngle) * branchLength
+                );
+                this.createAxonBranch(new THREE.Vector3(x, y, z), branchEnd);
+            }
+        }
+
+        // Create main axon tube
+        const curve = new THREE.CatmullRomCurve3(points);
         const axonGeometry = new THREE.TubeGeometry(
-            new THREE.CatmullRomCurve3(points),
-            50,  // tubular segments
+            curve,
+            segments * 5,  // tubular segments
             0.3, // radius
             8,   // radial segments
             false // closed
@@ -315,39 +275,85 @@ class NeuronSimulation {
         this.axon = new THREE.Mesh(axonGeometry, axonMaterial);
         this.scene.add(this.axon);
 
-        // Add myelin sheaths
-        this.createMyelinSheaths(points);
+        // Add myelin sheaths with proper nodes of Ranvier
+        this.createMyelinSheaths(curve.getPoints(segments * 5));
+    }
+
+    createAxonBranch(start, end) {
+        const branchPoints = [];
+        const branchSegments = 5;
+        
+        for (let i = 0; i <= branchSegments; i++) {
+            const t = i / branchSegments;
+            const point = new THREE.Vector3().lerpVectors(start, end, t);
+            // Add some natural variation
+            if (i > 0 && i < branchSegments) {
+                point.y += (Math.random() - 0.5) * 0.3;
+                point.z += (Math.random() - 0.5) * 0.3;
+            }
+            branchPoints.push(point);
+        }
+
+        const branchCurve = new THREE.CatmullRomCurve3(branchPoints);
+        const branchGeometry = new THREE.TubeGeometry(
+            branchCurve,
+            branchSegments * 3,
+            0.15, // thinner than main axon
+            6,
+            false
+        );
+
+        const branchMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffcc88,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const branch = new THREE.Mesh(branchGeometry, branchMaterial);
+        this.scene.add(branch);
     }
 
     createMyelinSheaths(axonPoints) {
         const myelinMaterial = new THREE.MeshPhongMaterial({
             color: 0xffffff,
             transparent: true,
-            opacity: 0.5
+            opacity: 0.7,
+            side: THREE.DoubleSide
         });
 
-        // Create myelin segments along the axon
-        for (let i = 5; i < axonPoints.length - 5; i += 10) {
-            const myelinGeometry = new THREE.CylinderGeometry(
-                0.5,  // top radius
-                0.5,  // bottom radius
-                2,    // height
-                16    // segments
-            );
-
-            const myelin = new THREE.Mesh(myelinGeometry, myelinMaterial);
-            
-            // Position myelin segment
+        const nodeLength = 0.5; // Length of nodes of Ranvier
+        const myelinLength = 2.5; // Length of myelin segments
+        let currentDistance = 0;
+        
+        for (let i = 1; i < axonPoints.length; i++) {
             const point = axonPoints[i];
-            myelin.position.set(point.x, point.y, point.z);
-            
-            // Orient myelin segment along axon
-            if (i < axonPoints.length - 1) {
-                myelin.lookAt(axonPoints[i + 1]);
-                myelin.rotateX(Math.PI / 2);
+            const prevPoint = axonPoints[i-1];
+            const segmentLength = point.distanceTo(prevPoint);
+            currentDistance += segmentLength;
+
+            // Create myelin segments with proper spacing for nodes of Ranvier
+            if (currentDistance >= myelinLength) {
+                const myelinGeometry = new THREE.CylinderGeometry(
+                    0.5,  // top radius
+                    0.5,  // bottom radius
+                    myelinLength - nodeLength,    // length minus node gap
+                    16,   // segments
+                    3,    // height segments
+                    true  // open-ended
+                );
+
+                const myelin = new THREE.Mesh(myelinGeometry, myelinMaterial);
+                myelin.position.copy(point);
+                
+                // Orient myelin segment along axon
+                if (i < axonPoints.length - 1) {
+                    myelin.lookAt(axonPoints[i + 1]);
+                    myelin.rotateX(Math.PI / 2);
+                }
+                
+                this.scene.add(myelin);
+                currentDistance = 0; // Reset distance for next segment
             }
-            
-            this.scene.add(myelin);
         }
     }
 
@@ -361,53 +367,77 @@ class NeuronSimulation {
         for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2;
             const length = 2 + Math.random() * 2;
-
-            // Create branching dendrites
+            const startPos = soma.position.clone();
+            
+            // Create primary dendrite branch
             this.createDendriteBranch(
-                soma.position.clone(),
+                startPos,
                 angle,
                 length,
                 0.2,
-                3,
-                dendriteMaterial
+                4, // Increased branch depth
+                dendriteMaterial,
+                Math.PI / 4 // Maximum branch angle
             );
         }
     }
 
-    createDendriteBranch(startPos, angle, length, radius, branchDepth, material) {
+    createDendriteBranch(startPos, angle, length, radius, branchDepth, material, maxBranchAngle) {
         if (branchDepth <= 0) return;
 
+        // Add some natural variation to the branch
         const endPos = new THREE.Vector3(
-            startPos.x + Math.cos(angle) * length,
-            startPos.y + Math.sin(angle) * length,
+            startPos.x + Math.cos(angle) * length + (Math.random() - 0.5) * 0.5,
+            startPos.y + Math.sin(angle) * length + (Math.random() - 0.5) * 0.5,
             startPos.z + (Math.random() - 0.5) * length
         );
 
-        // Create dendrite segment
-        const points = [startPos, endPos];
+        // Create points for curved branch
+        const points = [];
+        const segments = 5;
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const pos = new THREE.Vector3().lerpVectors(startPos, endPos, t);
+            
+            // Add some natural waviness
+            if (i > 0 && i < segments) {
+                pos.x += Math.sin(t * Math.PI) * 0.2;
+                pos.y += Math.sin(t * Math.PI * 2) * 0.2;
+            }
+            points.push(pos);
+        }
+
+        // Create curved dendrite segment
+        const curve = new THREE.CatmullRomCurve3(points);
         const dendriteGeometry = new THREE.TubeGeometry(
-            new THREE.CatmullRomCurve3(points),
+            curve,
             8,     // tubular segments
             radius, // radius
-            8,     // radial segments
+            6,     // radial segments
             false  // closed
         );
 
         const dendrite = new THREE.Mesh(dendriteGeometry, material);
         this.scene.add(dendrite);
 
-        // Create branches
-        if (branchDepth > 1) {
-            const branchCount = 2;
-            for (let i = 0; i < branchCount; i++) {
-                const newAngle = angle + (Math.random() - 0.5) * Math.PI / 2;
+        // Create branches with decreasing probability as we go deeper
+        const branchCount = Math.max(2, Math.floor(Math.random() * 4));
+        const branchProbability = 0.7 * (branchDepth / 4); // Reduce probability with depth
+
+        for (let i = 0; i < branchCount; i++) {
+            if (Math.random() < branchProbability) {
+                const branchAngle = angle + (Math.random() - 0.5) * maxBranchAngle;
+                const newLength = length * 0.7;
+                const newRadius = radius * 0.8;
+                
                 this.createDendriteBranch(
                     endPos,
-                    newAngle,
-                    length * 0.7,
-                    radius * 0.7,
+                    branchAngle,
+                    newLength,
+                    newRadius,
                     branchDepth - 1,
-                    material
+                    material,
+                    maxBranchAngle * 0.8 // Reduce maximum branch angle with depth
                 );
             }
         }
@@ -451,7 +481,63 @@ class NeuronSimulation {
 
     releaseNeurotransmitters() {
         const type = document.getElementById('ntType').value;
+        const releasePattern = this.determineReleasePattern(type);
         
+        switch(releasePattern) {
+            case 'burst':
+                this.burstRelease(type);
+                break;
+            case 'single':
+                this.singleVesicleRelease(type);
+                break;
+            case 'continuous':
+                this.startContinuousRelease(type);
+                break;
+        }
+    }
+
+    determineReleasePattern(type) {
+        // Determine release pattern based on neurotransmitter type and current conditions
+        const properties = NEUROTRANSMITTER_TYPES[type];
+        
+        if (this.activeEffects.reward_enhancement && type === 'DOPAMINE') {
+            return 'burst';
+        }
+        
+        if (properties.reuptakeRate > 0.8) {
+            return 'continuous';
+        }
+        
+        return 'single';
+    }
+
+    burstRelease(type) {
+        const vesicleCount = 3;
+        const delay = 100; // ms between vesicle releases
+        
+        for (let i = 0; i < vesicleCount; i++) {
+            setTimeout(() => {
+                this.singleVesicleRelease(type);
+            }, i * delay);
+        }
+    }
+
+    startContinuousRelease(type) {
+        const duration = 3000; // 3 seconds
+        const interval = 200; // Release every 200ms
+        const startTime = Date.now();
+        
+        const continuousRelease = () => {
+            if (Date.now() - startTime < duration) {
+                this.singleVesicleRelease(type, 0.3); // Reduced amount
+                setTimeout(continuousRelease, interval);
+            }
+        };
+        
+        continuousRelease();
+    }
+
+    singleVesicleRelease(type, amount = 1.0) {
         if (this.vesicles.length > 0) {
             const vesicle = this.vesicles[0];
             const releasePosition = new THREE.Vector3(-3.5, 0, 0);
@@ -459,7 +545,7 @@ class NeuronSimulation {
             // Move vesicle to release position
             vesicle.moveToReleasePosition(releasePosition, () => {
                 // Release neurotransmitters
-                this.createNeurotransmitterBurst(vesicle.mesh.position, type);
+                this.createNeurotransmitterBurst(vesicle.mesh.position, type, amount);
                 
                 // Animate vesicle disappearing
                 const fadeOut = (opacity) => {
@@ -480,7 +566,7 @@ class NeuronSimulation {
         }
     }
 
-    createNeurotransmitterBurst(position, type) {
+    createNeurotransmitterBurst(position, type, amount = 1.0) {
         const count = 6; // Match the number of stored neurotransmitters
         const spread = 0.2; // Reduced spread for more focused release
         
@@ -564,174 +650,184 @@ class NeuronSimulation {
         });
         
         this.checkDegradation();
+
+        this.checkSynergies();
+        this.updateReceptorSensitivity();
+        
+        // Update neurotransmitter effects based on receptor sensitivity
+        this.neurotransmitters.forEach(nt => {
+            const sensitivity = this.receptorSensitivity[nt.type];
+            if (nt.bound) {
+                nt.mesh.scale.setScalar(sensitivity);
+                nt.mesh.material.opacity = sensitivity;
+            }
+        });
     }
 
     createSynapticStructure() {
-        // Create axon terminal (bulb-like structure as shown in diagram)
-        const terminalGeometry = new THREE.SphereGeometry(2.5, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.7);
+        // Create axon terminal with more realistic bulbous shape
+        const terminalShape = new THREE.Shape();
+        const bulbRadius = 2.5;
+        const neckRadius = 1.2;
+        
+        // Create custom bulbous shape
+        terminalShape.moveTo(0, -bulbRadius);
+        terminalShape.quadraticCurveTo(bulbRadius, -bulbRadius, bulbRadius, 0);
+        terminalShape.quadraticCurveTo(bulbRadius, bulbRadius, 0, bulbRadius);
+        terminalShape.quadraticCurveTo(-bulbRadius, bulbRadius, -bulbRadius, 0);
+        terminalShape.quadraticCurveTo(-bulbRadius, -bulbRadius, 0, -bulbRadius);
+
+        const extrudeSettings = {
+            steps: 1,
+            depth: 2,
+            bevelEnabled: true,
+            bevelThickness: 0.2,
+            bevelSize: 0.2,
+            bevelSegments: 3
+        };
+
+        const terminalGeometry = new THREE.ExtrudeGeometry(terminalShape, extrudeSettings);
         const neuronMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffcc88, // More yellow/orange like in diagram
+            color: 0xffcc88,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
         });
+        
         this.axonTerminal = new THREE.Mesh(terminalGeometry, neuronMaterial);
-        this.axonTerminal.position.x = -5;
+        this.axonTerminal.position.set(-5, 0, -1);
+        this.scene.add(this.axonTerminal);
+
+        // Create vesicle pool regions
+        this.createVesiclePoolRegions();
         
         // Add flow particles in terminal
         this.createAxonalFlow();
-        
-        this.scene.add(this.axonTerminal);
 
-        // Create dendrite terminal (receiving end)
-        const dendriteGeometry = new THREE.SphereGeometry(2.5, 32, 32);
-        this.dendrite = new THREE.Mesh(dendriteGeometry, neuronMaterial);
-        this.dendrite.position.x = 5;
-        this.scene.add(this.dendrite);
+        // Create postsynaptic density with proper membrane proteins
+        this.createPostsynapticDensity();
 
-        // Create more detailed synaptic cleft
-        const cleftGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.8, 32, 5, true);
+        // Create more detailed synaptic cleft with proper spacing
+        const cleftWidth = 0.04; // 40 nanometers in scene units
+        const cleftGeometry = new THREE.BoxGeometry(5, cleftWidth, 4);
         const cleftMaterial = new THREE.MeshPhongMaterial({
             color: 0xaaaaff,
             transparent: true,
             opacity: 0.1,
-            side: THREE.DoubleSide,
-            wireframe: true
+            side: THREE.DoubleSide
         });
         this.synapticCleft = new THREE.Mesh(cleftGeometry, cleftMaterial);
-        this.synapticCleft.rotation.z = Math.PI / 2;
+        this.synapticCleft.position.set(0, 0, 0);
         this.scene.add(this.synapticCleft);
 
         // Add extracellular matrix elements in the cleft
         this.createExtracellularMatrix();
 
-        // Create adhesion molecules connecting pre and post synaptic membranes
+        // Create adhesion molecules with proper spacing
         this.createAdhesionMolecules();
 
-        // Add reuptake transporters
+        // Add reuptake transporters with proper distribution
         this.createReuptakeTransporters();
+
+        // Create calcium channels
+        this.createCalciumChannels();
     }
 
-    createReuptakeTransporters() {
-        const transporterCount = 6;
-        this.transporters = [];
-        
-        for (let i = 0; i < transporterCount; i++) {
-            const transporterGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.4, 8);
-            const transporterMaterial = new THREE.MeshPhongMaterial({
-                color: 0xff9933, // Orange color for transporters
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const transporter = new THREE.Mesh(transporterGeometry, transporterMaterial);
-            
-            // Position transporters along both pre and post synaptic membranes
-            const angle = (i / transporterCount) * Math.PI;
-            const isPresynaptic = i % 2 === 0;
-            
-            transporter.position.set(
-                isPresynaptic ? -3.5 : 3.5,
-                Math.sin(angle) * 2,
-                Math.cos(angle) * 2
-            );
-            
-            transporter.rotation.z = isPresynaptic ? Math.PI / 2 : -Math.PI / 2;
-            
-            this.transporters.push(transporter);
-            this.scene.add(transporter);
-        }
-    }
-
-    createVesicles() {
-        this.vesicles = [];
-        const vesicleCount = 12;
-        
-        // Create vesicle clusters in different layers
-        const layers = 3;
-        const vesiclesPerLayer = 4;
-        
-        for (let layer = 0; layer < layers; layer++) {
-            for (let i = 0; i < vesiclesPerLayer; i++) {
-                const angle = (i / vesiclesPerLayer) * Math.PI * 2;
-                const radius = 0.8;
-                
-                const position = new THREE.Vector3(
-                    -4 - layer * 0.5, // Move back in layers
-                    Math.sin(angle) * radius,
-                    Math.cos(angle) * radius
-                );
-
-                const vesicle = new StorageVesicle(position);
-                this.vesicles.push(vesicle);
-                this.scene.add(vesicle.mesh);
-            }
-        }
-    }
-
-    createMembraneLipids() {
-        // Create lipid bilayer visualization
-        const createLipidLayer = (x, isUpper) => {
-            const lipidCount = 20;
-            const spacing = 0.3;
-            
-            for (let i = 0; i < lipidCount; i++) {
-                const headGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-                const tailGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.2, 8);
-                
-                const headMaterial = new THREE.MeshPhongMaterial({ color: 0xff9999 });
-                const tailMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc });
-                
-                const head = new THREE.Mesh(headGeometry, headMaterial);
-                const tail = new THREE.Mesh(tailGeometry, tailMaterial);
-                
-                const lipid = new THREE.Group();
-                lipid.add(head);
-                lipid.add(tail);
-                
-                tail.position.y = isUpper ? -0.1 : 0.1;
-                
-                lipid.position.set(
-                    x + (Math.random() - 0.5) * 0.1,
-                    i * spacing - (lipidCount * spacing) / 2,
-                    (Math.random() - 0.5) * 0.1
-                );
-                
-                if (!isUpper) {
-                    lipid.rotation.x = Math.PI;
-                }
-                
-                this.scene.add(lipid);
-            }
-        };
-
-        // Create upper and lower membrane layers for both neurons
-        createLipidLayer(-3, true);
-        createLipidLayer(-3, false);
-        createLipidLayer(3, true);
-        createLipidLayer(3, false);
-    }
-
-    createExtracellularMatrix() {
-        const matrixGeometry = new THREE.SphereGeometry(0.05, 8, 8);
-        const matrixMaterial = new THREE.MeshPhongMaterial({
-            color: 0x88aaff,
+    createVesiclePoolRegions() {
+        // Create reserve pool
+        const reservePoolGeometry = new THREE.TorusGeometry(1.5, 0.3, 16, 32);
+        const poolMaterial = new THREE.MeshPhongMaterial({
+            color: 0x88ff88,
             transparent: true,
             opacity: 0.3
         });
+        const reservePool = new THREE.Mesh(reservePoolGeometry, poolMaterial);
+        reservePool.position.set(-4.5, 0, 0);
+        this.axonTerminal.add(reservePool);
 
-        // Add matrix proteins throughout the cleft
-        for (let i = 0; i < 50; i++) {
-            const matrix = new THREE.Mesh(matrixGeometry, matrixMaterial);
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * 2;
-            
-            matrix.position.set(
-                Math.random() * 0.8 - 0.4,
-                Math.sin(angle) * radius,
-                Math.cos(angle) * radius
+        // Create readily releasable pool near membrane
+        const rrpGeometry = new THREE.TorusGeometry(0.8, 0.2, 16, 32);
+        const rrpMaterial = poolMaterial.clone();
+        rrpMaterial.color.setHex(0xff8888);
+        const rrp = new THREE.Mesh(rrpGeometry, rrpMaterial);
+        rrp.position.set(-3.2, 0, 0);
+        this.axonTerminal.add(rrp);
+    }
+
+    createPostsynapticDensity() {
+        const psdGeometry = new THREE.BoxGeometry(3, 0.2, 2);
+        const psdMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff8866,
+            transparent: true,
+            opacity: 0.6
+        });
+        this.psd = new THREE.Mesh(psdGeometry, psdMaterial);
+        this.psd.position.set(5, 0.1, 0);
+        this.scene.add(this.psd);
+
+        // Add receptor clusters
+        const receptorCount = 12;
+        const receptorGeometry = new THREE.BoxGeometry(0.15, 0.3, 0.15);
+        const receptorMaterial = new THREE.MeshPhongMaterial({
+            color: 0x44ff44,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        for (let i = 0; i < receptorCount; i++) {
+            const receptor = new THREE.Mesh(receptorGeometry, receptorMaterial);
+            const angle = (i / receptorCount) * Math.PI * 2;
+            const radius = 0.8;
+            receptor.position.set(
+                Math.cos(angle) * radius,
+                0.15,
+                Math.sin(angle) * radius
             );
-            
+            this.psd.add(receptor);
+        }
+    }
+
+    createCalciumChannels() {
+        const channelCount = 8;
+        const channelGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8);
+        const channelMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff4444,
+            transparent: true,
+            opacity: 0.7,
+            emissive: 0xff0000,
+            emissiveIntensity: 0.3
+        });
+
+        for (let i = 0; i < channelCount; i++) {
+            const channel = new THREE.Mesh(channelGeometry, channelMaterial);
+            const angle = (i / channelCount) * Math.PI * 2;
+            const radius = 1.8;
+            channel.position.set(
+                Math.cos(angle) * radius - 3.5,
+                0,
+                Math.sin(angle) * radius
+            );
+            channel.rotation.x = Math.PI / 2;
+            this.axonTerminal.add(channel);
+        }
+    }
+
+    createExtracellularMatrix() {
+        const matrixCount = 40;
+        const matrixGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+        const matrixMaterial = new THREE.MeshPhongMaterial({
+            color: 0x88aaff,
+            transparent: true,
+            opacity: 0.4
+        });
+
+        for (let i = 0; i < matrixCount; i++) {
+            const matrix = new THREE.Mesh(matrixGeometry, matrixMaterial);
+            matrix.position.set(
+                (Math.random() - 0.5) * 4,
+                0,
+                (Math.random() - 0.5) * 3
+            );
             this.synapticCleft.add(matrix);
         }
     }
@@ -783,35 +879,20 @@ class NeuronSimulation {
 
         this.neurotransmitters.forEach(nt => {
             if (!nt.bound && !nt.reuptaking) {
-                // Use type-specific reuptake rate
                 if (Math.random() < nt.properties.reuptakeRate) {
                     this.transporters.forEach(transporter => {
                         const distance = nt.mesh.position.distanceTo(transporter.position);
                         if (distance < 0.5) {
                             nt.reuptaking = true;
                             
-                            // Animate reuptake with visual effects
                             const startPos = nt.mesh.position.clone();
                             const targetPos = transporter.position.clone();
-                            const startScale = nt.mesh.scale.clone();
                             
                             const animate = (progress) => {
                                 if (progress <= 1) {
                                     nt.mesh.position.lerpVectors(startPos, targetPos, progress);
-                                    
-                                    // Scale and color transition during reuptake
-                                    const scale = 1 - (progress * 0.8);
-                                    nt.mesh.scale.setScalar(scale);
-                                    
-                                    const color = new THREE.Color();
-                                    color.lerpColors(
-                                        new THREE.Color(0x4444ff),
-                                        new THREE.Color(0x222222),
-                                        progress
-                                    );
-                                    nt.mesh.material.color = color;
-                                    
-                                    requestAnimationFrame(() => animate(progress + 0.02));
+                                    nt.mesh.material.opacity = 1 - progress;
+                                    requestAnimationFrame(() => animate(progress + 0.05));
                                 } else {
                                     this.scene.remove(nt.mesh);
                                     this.neurotransmitters = this.neurotransmitters.filter(n => n !== nt);
@@ -828,7 +909,14 @@ class NeuronSimulation {
 
     updateEffects() {
         const effects = document.getElementById('effects');
-        const activeNTs = new Set(this.neurotransmitters.map(nt => nt.type));
+        const activeNTs = new Set();
+        
+        // Count bound neurotransmitters
+        this.neurotransmitters.forEach(nt => {
+            if (nt.bound) {
+                activeNTs.add(nt.type);
+            }
+        });
         
         let effectText = '';
         activeNTs.forEach(type => {
@@ -841,29 +929,34 @@ class NeuronSimulation {
         // Update emotional face if it exists
         if (this.emotionalFace) {
             try {
-                this.emotionalFace.updateExpression(this.neurotransmitters);
+                this.emotionalFace.updateFromNeurotransmitters(this.neurotransmitters);
             } catch (error) {
                 console.error('Error updating emotional face:', error);
             }
         }
     }
 
-    createStorageVesicle(position, type) {
-        const vesicle = new StorageVesicle(position);
-        const ntProperties = NEUROTRANSMITTER_TYPES[type];
+    createStorageVesicles() {
+        const vesicleCount = 12;
+        const layers = 3;
+        const vesiclesPerLayer = Math.floor(vesicleCount / layers);
         
-        // Update vesicle color based on neurotransmitter type
-        vesicle.mesh.material.color.setHex(ntProperties.color);
-        vesicle.mesh.material.opacity = 0.6;
-        
-        // Update stored neurotransmitter colors
-        vesicle.storedNeurotransmitters.forEach(nt => {
-            nt.material.color.setHex(ntProperties.color);
-            nt.material.emissive.setHex(ntProperties.color);
-            nt.material.emissiveIntensity = 0.2;
-        });
-        
-        return vesicle;
+        for (let layer = 0; layer < layers; layer++) {
+            for (let i = 0; i < vesiclesPerLayer; i++) {
+                const angle = (i / vesiclesPerLayer) * Math.PI * 2;
+                const radius = 0.8;
+                
+                const position = new THREE.Vector3(
+                    -4 - layer * 0.5, // Move back in layers
+                    Math.sin(angle) * radius,
+                    Math.cos(angle) * radius
+                );
+
+                const vesicle = new StorageVesicle(position);
+                this.vesicles.push(vesicle);
+                this.scene.add(vesicle.mesh);
+            }
+        }
     }
 
     createAxonalFlow() {
@@ -1014,6 +1107,99 @@ class NeuronSimulation {
         };
         
         animate(0);
+    }
+
+    checkSynergies() {
+        const activeTypes = new Set(this.neurotransmitters.map(nt => nt.type));
+        
+        // Check for synergistic effects
+        activeTypes.forEach(type => {
+            const properties = NEUROTRANSMITTER_TYPES[type];
+            if (properties.synergies) {
+                Object.entries(properties.synergies).forEach(([synType, synEffect]) => {
+                    if (activeTypes.has(synType)) {
+                        this.activeEffects[synEffect.effect] = true;
+                        this.applySynergisticEffect(type, synType, synEffect);
+                    }
+                });
+            }
+        });
+
+        // Check for antagonistic effects
+        activeTypes.forEach(type => {
+            const properties = NEUROTRANSMITTER_TYPES[type];
+            if (properties.antagonists) {
+                properties.antagonists.forEach(antagonist => {
+                    if (activeTypes.has(antagonist)) {
+                        this.applyAntagonisticEffect(type, antagonist);
+                    }
+                });
+            }
+        });
+    }
+
+    applySynergisticEffect(type1, type2, effect) {
+        // Enhance neurotransmitter effects
+        this.neurotransmitters.forEach(nt => {
+            if (nt.type === type1 || nt.type === type2) {
+                nt.mesh.scale.multiplyScalar(effect.multiplier);
+                nt.mesh.material.emissiveIntensity *= effect.multiplier;
+            }
+        });
+    }
+
+    applyAntagonisticEffect(type1, type2) {
+        // Reduce effectiveness of antagonistic neurotransmitters
+        this.neurotransmitters.forEach(nt => {
+            if (nt.type === type1 || nt.type === type2) {
+                nt.mesh.scale.multiplyScalar(0.7);
+                nt.mesh.material.opacity *= 0.7;
+            }
+        });
+    }
+
+    updateReceptorSensitivity() {
+        // Update receptor sensitivity based on neurotransmitter levels
+        Object.keys(this.receptorSensitivity).forEach(type => {
+            const typeCount = this.neurotransmitters.filter(nt => nt.type === type).length;
+            if (typeCount > 10) {
+                // Decrease sensitivity with high levels
+                this.receptorSensitivity[type] *= 0.95;
+            } else if (typeCount === 0) {
+                // Recover sensitivity when no neurotransmitters present
+                this.receptorSensitivity[type] = Math.min(1.0, this.receptorSensitivity[type] * 1.05);
+            }
+        });
+    }
+
+    createReuptakeTransporters() {
+        const transporterCount = 6;
+        
+        for (let i = 0; i < transporterCount; i++) {
+            const transporterGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.4, 8);
+            const transporterMaterial = new THREE.MeshPhongMaterial({
+                color: 0xff9933, // Orange color for transporters
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const transporter = new THREE.Mesh(transporterGeometry, transporterMaterial);
+            
+            // Position transporters along both pre and post synaptic membranes
+            const angle = (i / transporterCount) * Math.PI;
+            const isPresynaptic = i % 2 === 0;
+            
+            transporter.position.set(
+                isPresynaptic ? -3.5 : 3.5,
+                Math.sin(angle) * 2,
+                Math.cos(angle) * 2
+            );
+            
+            transporter.rotation.z = isPresynaptic ? Math.PI / 2 : -Math.PI / 2;
+            
+            this.transporters.push(transporter);
+            this.scene.add(transporter);
+        }
     }
 }
 
