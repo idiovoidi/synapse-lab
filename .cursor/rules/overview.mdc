@@ -1,0 +1,52 @@
+---
+description: Project Overview
+globs: 
+alwaysApply: false
+---
+Project Overview: Neurotransmitter Simulation
+This is an interactive 3D visualization project that simulates neurotransmitter behavior at the synaptic level, built using Three.js. The simulation aims to provide an educational tool for understanding neural signaling.
+
+Key Components:
+Synaptic Structure
+Detailed presynaptic terminal with bulbous shape
+Anatomically accurate synaptic cleft (20-40nm spacing)
+Postsynaptic membrane with receptor clusters
+Voltage-gated calcium channels
+Synaptic vesicles with neurotransmitters
+
+Neurotransmitter Types:
+Dopamine
+Serotonin
+Glutamate
+GABA
+Norepinephrine
+Each with unique properties (color, release rate, reuptake rate, diffusion speed)
+
+Interactive Features
+Release neurotransmitter buttons
+Neurotransmitter type selection
+Reset functionality
+Camera controls for viewing different angles
+Real-time visualization of neurotransmitter effects
+
+Biological Processes Simulated
+Action potential arrival
+Calcium channel activation
+Vesicle release
+Neurotransmitter diffusion
+Receptor binding
+Reuptake mechanisms
+Enzymatic degradation
+
+Recent Improvements:
+Code organization and modularity:
+Separated concerns into distinct modules
+Created utility classes for animations and math
+Centralized configuration
+Improved resource management
+
+Enhanced visualization:
+More accurate anatomical structures
+Better particle effects
+Improved animations
+Realistic membrane dynamics
