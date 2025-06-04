@@ -1,13 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EmotionalFace } from './emotionalFace.js';
-import { Neurotransmitter, NEUROTRANSMITTER_TYPES } from './neurotransmitter.js';
+import { Neurotransmitter } from './biological/Neurotransmitters/Neurotransmitter.js';
 import { StorageVesicle } from './storageVesicle.js';
 import { NeuronModels } from './neuronModels.js';
-import { SceneManager } from './utils/sceneManager.js';
+import { SceneManager } from './visualization/SceneManager.js';
 import { AnimationManager } from './utils/animationUtils.js';
 import { SynapticStructure } from './models/SynapticStructure.js';
-import { Neurotransmitter } from './models/Neurotransmitter.js';
 import { Receptor } from './models/Receptor.js';
 import { NEUROTRANSMITTER_TYPES, ANIMATION_SETTINGS } from './constants/config.js';
 

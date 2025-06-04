@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurotransmitter Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        select {
+            padding: 8px;
+            margin: 4px 2px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="controls">
+        <select id="ntType">
+            <option value="DOPAMINE">Dopamine</option>
+            <option value="SEROTONIN">Serotonin</option>
+            <option value="GLUTAMATE">Glutamate</option>
+            <option value="GABA">GABA</option>
+            <option value="NOREPINEPHRINE">Norepinephrine</option>
+        </select>
+        <button id="releaseBtn">Release</button>
+        <button id="resetBtn">Reset</button>
+    </div>
+</body>
+</html> 
