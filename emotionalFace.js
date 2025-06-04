@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-class EmotionalFace {
+export class EmotionalFace {
     constructor() {
         try {
             // Create face scene
@@ -177,6 +177,4 @@ class EmotionalFace {
         requestAnimationFrame(() => this.animate());
         this.renderer.render(this.scene, this.camera);
     }
-}
-
-export { EmotionalFace }; 
+} 

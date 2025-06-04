@@ -1,0 +1,55 @@
+// Neurotransmitter type definitions for the simulation
+// Exported as a named export for use in other modules
+
+export const NEUROTRANSMITTER_TYPES = {
+    DOPAMINE: {
+        name: 'Dopamine',
+        color: 0x9933ff, // Purple
+        speed: 0.12,
+        size: 0.25,
+        description: 'Reward and pleasure signaling',
+        reuptakeRate: 0.8,
+        maoSensitive: true,
+        degradationRate: 0.6
+    },
+    SEROTONIN: {
+        name: 'Serotonin',
+        color: 0xff9933, // Orange
+        speed: 0.1,
+        size: 0.22,
+        description: 'Mood and emotional regulation',
+        reuptakeRate: 0.7,
+        maoSensitive: true,
+        degradationRate: 0.7
+    },
+    GLUTAMATE: {
+        name: 'Glutamate',
+        color: 0x4444ff, // Blue
+        speed: 0.15,
+        size: 0.2,
+        description: 'Primary excitatory neurotransmitter',
+        reuptakeRate: 0.9,
+        maoSensitive: false,
+        degradationRate: 0.3
+    },
+    GABA: {
+        name: 'GABA',
+        color: 0x44ff44, // Green
+        speed: 0.08,
+        size: 0.23,
+        description: 'Primary inhibitory neurotransmitter',
+        reuptakeRate: 0.6,
+        maoSensitive: false,
+        degradationRate: 0.3
+    },
+    NOREPINEPHRINE: {
+        name: 'Norepinephrine',
+        color: 0xff4444, // Red
+        speed: 0.13,
+        size: 0.21,
+        description: 'Arousal and attention',
+        reuptakeRate: 0.75,
+        maoSensitive: true,
+        degradationRate: 0.65
+    }
+}; 
