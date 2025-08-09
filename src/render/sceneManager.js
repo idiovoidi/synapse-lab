@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 /**
  * Manages the Three.js scene, camera, renderer, and animation loop.
@@ -34,6 +35,15 @@ export class SceneManager {
         const mainLight = new THREE.DirectionalLight(0xffffff, 1);
         mainLight.position.set(10, 10, 10);
         this.scene.add(mainLight);
+
+        // Orbit controls
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.08;
+        this.controls.minDistance = 10;
+        this.controls.maxDistance = 120;
+        this.controls.target.set(0, 0, 0);
+        this.controls.update();
     }
 
     add(object) {
@@ -45,6 +55,7 @@ export class SceneManager {
     }
 
     render() {
+        if (this.controls) this.controls.update();
         this.renderer.render(this.scene, this.camera);
     }
 
