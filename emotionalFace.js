@@ -97,46 +97,35 @@ export class EmotionalFace {
         this.scene.add(this.mouth);
     }
 
-    updateExpression(neurotransmitters) {
-        if (!Array.isArray(neurotransmitters)) {
-            console.warn('Invalid neurotransmitters array provided');
+    updateExpression(moodSummaryOrNeurotransmitters) {
+        // Accept either a precomputed mood summary or a list of NTs (backward compatibility)
+        const summary = moodSummaryOrNeurotransmitters;
+        if (summary && typeof summary === 'object' && 'happiness' in summary) {
+            this.currentMood = {
+                happiness: summary.happiness || 0,
+                arousal: summary.arousal || 0,
+                anxiety: summary.anxiety || 0
+            };
+        } else if (Array.isArray(summary)) {
+            // Fallback: compute roughly from NT list
+            this.currentMood = { happiness: 0, arousal: 0, anxiety: 0 };
+            summary.forEach(nt => {
+                if (!nt || !nt.type) return;
+                switch(nt.type) {
+                    case 'DOPAMINE':
+                        this.currentMood.happiness += 0.3; this.currentMood.arousal += 0.2; break;
+                    case 'SEROTONIN':
+                        this.currentMood.happiness += 0.2; this.currentMood.anxiety -= 0.3; break;
+                    case 'NOREPINEPHRINE':
+                        this.currentMood.arousal += 0.3; this.currentMood.anxiety += 0.2; break;
+                    case 'GABA':
+                        this.currentMood.anxiety -= 0.2; this.currentMood.arousal -= 0.2; break;
+                }
+            });
+        } else {
             return;
         }
 
-        // Update mood based on neurotransmitter levels
-        this.currentMood = {
-            happiness: 0,
-            arousal: 0,
-            anxiety: 0
-        };
-
-        neurotransmitters.forEach(nt => {
-            if (!nt || !nt.type) {
-                console.warn('Invalid neurotransmitter object:', nt);
-                return;
-            }
-
-            switch(nt.type) {
-                case 'DOPAMINE':
-                    this.currentMood.happiness += 0.3;
-                    this.currentMood.arousal += 0.2;
-                    break;
-                case 'SEROTONIN':
-                    this.currentMood.happiness += 0.2;
-                    this.currentMood.anxiety -= 0.3;
-                    break;
-                case 'NOREPINEPHRINE':
-                    this.currentMood.arousal += 0.3;
-                    this.currentMood.anxiety += 0.2;
-                    break;
-                case 'GABA':
-                    this.currentMood.anxiety -= 0.2;
-                    this.currentMood.arousal -= 0.2;
-                    break;
-            }
-        });
-
-        // Update facial features
         this.updateMouth();
         this.updateEyes();
     }

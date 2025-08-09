@@ -1,30 +1,22 @@
 import * as THREE from 'three';
-import { EmotionalFace } from '../../emotionalFace.js';
-import { SceneManager } from '../render/sceneManager.js';
-import { StorageVesicle } from '../models/storageVesicle.js';
 import { NEUROTRANSMITTER_TYPES } from '../constants/neurotransmitterTypes.js';
+import { StorageVesicle } from '../models/storageVesicle.js';
 import { Neurotransmitter } from '../models/neurotransmitter.js';
 
 export class NeuronSimulation {
-    constructor(sceneManager) {
+    constructor(sceneManager, eventBus = null) {
         this.sceneManager = sceneManager;
         this.scene = sceneManager.scene;
         this.camera = sceneManager.camera;
         this.renderer = sceneManager.renderer;
+        this.eventBus = eventBus;
 
         // Initialize properties
         this.neurotransmitters = [];
         this.receptors = [];
         this.vesicles = [];
         
-        // Create emotional face first, before any animations start
-        try {
-            this.emotionalFace = new EmotionalFace();
-            console.log('Emotional face created successfully');
-        } catch (error) {
-            console.error('Error creating emotional face:', error);
-            this.emotionalFace = null;
-        }
+        // Emotional face is managed by UI/presentation layer
 
         // Create neurons and receptors
         this.createNeurons();
@@ -236,9 +228,11 @@ export class NeuronSimulation {
         }
     }
 
-    releaseNeurotransmitters() {
-        const type = document.getElementById('ntType').value;
-        
+    releaseNeurotransmitters(type) {
+        if (!type || !NEUROTRANSMITTER_TYPES[type]) {
+            type = 'DOPAMINE';
+        }
+
         if (this.vesicles.length > 0) {
             const vesicle = new StorageVesicle(this.vesicles[0].mesh.position.clone());
             const releasePosition = new THREE.Vector3(-3.5, 0, 0);
@@ -286,6 +280,7 @@ export class NeuronSimulation {
                 const nt = new Neurotransmitter(pos, type);
                 this.neurotransmitters.push(nt);
                 this.scene.add(nt.mesh);
+                if (this.eventBus) this.eventBus.emit('nt:released', { type, nt });
             }, i * 50);
         }
     }
@@ -314,9 +309,10 @@ export class NeuronSimulation {
                             nt.bound = true;
                             nt.mesh.position.copy(receptor.position);
                             receptor.occupied = true;
-                            receptor.material.color.setHex(
-                                nt.type === 'excitatory' ? 0xff4444 : 0x44ff44
-                            );
+                            const polarity = NEUROTRANSMITTER_TYPES[nt.type]?.polarity;
+                            const color = polarity === 'EXCITATORY' ? 0xff4444 : 0x44ff44;
+                            receptor.material.color.setHex(color);
+                            if (this.eventBus) this.eventBus.emit('nt:bound', { nt, receptor });
                         }
                     }
                 });
@@ -567,6 +563,7 @@ export class NeuronSimulation {
                                 } else {
                                     this.scene.remove(nt.mesh);
                                     this.neurotransmitters = this.neurotransmitters.filter(n => n !== nt);
+                                    if (this.eventBus) this.eventBus.emit('nt:reuptaken', { nt, transporter });
                                 }
                             };
                             
@@ -579,24 +576,26 @@ export class NeuronSimulation {
     }
 
     updateEffects() {
-        const effects = document.getElementById('effects');
         const activeNTs = new Set(this.neurotransmitters.map(nt => nt.type));
-        
-        let effectText = '';
-        activeNTs.forEach(type => {
+        this.latestEffects = Array.from(activeNTs).map(type => {
             const properties = NEUROTRANSMITTER_TYPES[type];
-            effectText += `<p><strong>${properties.name}:</strong> ${properties.description}</p>`;
+            return { type, name: properties.name, description: properties.description };
         });
-        
-        effects.innerHTML = effectText || 'No active neurotransmitters';
-        
-        // Update emotional face if it exists
-        if (this.emotionalFace) {
-            try {
-                this.emotionalFace.updateExpression(this.neurotransmitters);
-            } catch (error) {
-                console.error('Error updating emotional face:', error);
-            }
+
+        // Compute mood summary for EmotionalFace and UI consumers
+        const mood = { happiness: 0, arousal: 0, anxiety: 0 };
+        this.neurotransmitters.forEach(nt => {
+            const w = NEUROTRANSMITTER_TYPES[nt.type]?.moodWeights;
+            if (!w) return;
+            mood.happiness += w.happiness || 0;
+            mood.arousal += w.arousal || 0;
+            mood.anxiety += w.anxiety || 0;
+        });
+        this.moodSummary = mood;
+
+        if (this.eventBus) {
+            this.eventBus.emit('sim:effectsUpdated', this.latestEffects);
+            this.eventBus.emit('sim:moodUpdated', this.moodSummary);
         }
     }
 
@@ -724,6 +723,7 @@ export class NeuronSimulation {
                             } else {
                                 this.scene.remove(nt.mesh);
                                 this.neurotransmitters = this.neurotransmitters.filter(n => n !== nt);
+                                if (this.eventBus) this.eventBus.emit('nt:degraded', { nt, enzyme });
                             }
                         };
                         
@@ -761,7 +761,9 @@ export class NeuronSimulation {
                 particle.material.opacity = 0.5 * (1 - progress);
                 requestAnimationFrame(() => animate(progress + 0.05));
             } else {
-                this.scene.add(particle);
+                this.scene.remove(particle);
+                if (particle.geometry) particle.geometry.dispose();
+                if (particle.material) particle.material.dispose();
             }
         };
         
@@ -787,10 +789,6 @@ export class NeuronSimulation {
 
         // Camera rotation and rendering are handled by SceneManager
         // We might still need camera updates related to simulation state if any
-         const time = Date.now() * 0.0001; // Example: if camera movement is tied to time
-         this.camera.position.x = Math.cos(time) * 30;
-         this.camera.position.z = Math.sin(time) * 30;
-         this.camera.position.y = 15 + Math.sin(time * 0.5) * 5;
-         this.camera.lookAt(0, 0, 0);
+        // Camera motion moved to SceneManager (or disabled)
     }
 }

@@ -20,8 +20,6 @@ export class Neurotransmitter {
         this.reuptaking = false;
 
         // Create more directed movement toward receptors
-        const targetX = 4;
-        const directionX = targetX - position.x;
         const spread = 0.3;
 
         this.velocity = new THREE.Vector3(

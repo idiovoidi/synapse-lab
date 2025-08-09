@@ -18,6 +18,13 @@ export class SceneManager {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(this.renderer.domElement);
 
+        // Handle resize
+        window.addEventListener('resize', () => {
+            this.camera.aspect = window.innerWidth / window.innerHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
         // Add lights
         const ambientLight = new THREE.AmbientLight(0x404040);
         this.scene.add(ambientLight);

@@ -1,74 +1,152 @@
 # Refactoring Plan for Biology_Neurotransmitters
 
-This plan will guide the transition to a clean, maintainable architecture as described in `CLEAN_ARCHITECTURE_RULES.md`.
+This plan refactors the codebase to align with `CLEAN_ARCHITECTURE_RULES.md`, fixes correctness issues, and establishes clear contracts between simulation, rendering, and UI layers.
 
 ---
 
-## Step 1: Set Up Project Structure
-- Create a `src/` directory.
-- Inside `src/`, create the following folders:
-  - `models/`
-  - `constants/`
-  - `simulation/`
-  - `render/`
-  - `ui/`
-  - `utils/`
-- Move existing code files into `src/` as appropriate (temporarily, if needed).
+## Objectives
+- Enforce separation of concerns between domain/simulation, rendering (Three.js), and UI/DOM.
+- Fix current logic bugs and lifecycle leaks.
+- Introduce explicit APIs and events for inter-layer communication.
+- Improve performance and maintainability for future features.
 
 ---
 
-## Step 2: Extract Constants
-- Move neurotransmitter type definitions and other configuration values from `simulation.js` to `src/constants/neurotransmitterTypes.js`.
-- Export these constants for use elsewhere.
+## Layer definitions
+- `src/models/`: Domain entities (pure data + minimal behavior). No Three.js/DOM.
+- `src/constants/`: Configuration and constants (e.g., neurotransmitter definitions).
+- `src/simulation/`: Simulation rules, state updates, and events. No Three.js/DOM.
+- `src/render/`: Three.js scene management, mesh creation, transforms, camera.
+- `src/ui/`: DOM elements, event handlers, formatting for info panel.
+- `src/utils/`: Cross-cutting helpers (e.g., event bus).
 
 ---
 
-## Step 3: Extract Domain Models
-- Move the `Neurotransmitter` and `StorageVesicle` classes to `src/models/` as separate files (e.g., `neurotransmitter.js`, `storageVesicle.js`).
-- Ensure these files only contain domain logic, not rendering or UI code.
+## Phase 0 — Pre-flight
+- Verify current app runs in the browser via `index.html` and `simulation.js`.
+- Create a baseline Git commit before changes.
 
 ---
 
-## Step 4: Isolate Simulation Logic
-- Move the main simulation logic (e.g., `NeuronSimulation` class) to `src/simulation/neuronSimulation.js`.
-- Refactor so this class only manages simulation state and rules, not direct rendering or DOM manipulation.
+## Phase 1 — Quick wins (bug fixes and small decouplings)
+Make these minimal, safe edits first:
+
+- Fix receptor color logic in `src/simulation/neuronSimulation.js` by adding a `polarity` field to each entry in `src/constants/neurotransmitterTypes.js` (e.g., `"EXCITATORY" | "INHIBITORY"`) and color receptors based on that mapping when binding.
+- Fix degradation particle lifecycle in `checkDegradation()` → end branch must remove the particle from the scene (not re-add it).
+- Remove unused import of `EmotionalFace` from `simulation.js` and unused variables in `src/models/neurotransmitter.js`.
+- Stop camera updates inside `NeuronSimulation.update()`; move camera motion to `src/render/sceneManager.js` (or disable for now).
+- Add window resize handling in `src/render/sceneManager.js` to keep aspect and viewport correct.
+- Improve `reset()` to clear neurotransmitters and reset receptors; optionally also clear or rebuild vesicles/enzymes/ECM for a full reset.
+- Decouple immediate DOM access:
+  - Change `NeuronSimulation.releaseNeurotransmitters(type)` to accept a `type` argument rather than reading `document.getElementById('ntType')`.
+  - Move effects panel updates out of `NeuronSimulation.updateEffects()` into `src/ui/controls.js` (temporary; in Phase 2 this becomes event-driven).
+- Update `src/ui/controls.js` to pass the selected type into `releaseNeurotransmitters(type)` and to render the info panel based on a getter.
+
+Acceptance (Phase 1): Visual behavior unchanged, bugs fixed, no direct DOM reads inside `NeuronSimulation`.
 
 ---
 
-## Step 5: Separate Rendering Logic
-- Move all Three.js scene setup, camera, lights, animation loop, and mesh creation to `src/render/sceneManager.js` (or similar).
-- The rendering layer should listen for simulation state changes and update the scene accordingly.
+## Phase 2 — Decouple simulation from rendering and UI (event-driven)
+Introduce an event bus and move mesh creation out of the simulation layer.
+
+- Add `src/utils/eventBus.js` (simple pub/sub with `on`, `off`, `emit`).
+- Refactor `NeuronSimulation` (in `src/simulation/neuronSimulation.js`):
+  - Remove all Three.js and DOM usage.
+  - Maintain pure simulation state (entities and relationships).
+  - Emit events for lifecycle changes: `nt:released`, `nt:moved`, `nt:bound`, `nt:reuptaken`, `nt:degraded`, `sim:reset`, `sim:effectsUpdated`.
+  - Provide `getSnapshot()` returning lightweight state and `getMoodSummary()`.
+- Create `src/render/synapseRenderer.js`:
+  - Build meshes for neurons, receptors, cleft, transporters, enzymes, vesicles.
+  - Map entity IDs to meshes; update transforms on events/ticks.
+  - No simulation rules here; rendering only.
+- Update `src/render/sceneManager.js`:
+  - Own the camera and animation loop; invoke a provided `updateCallback` for the simulation tick and then render.
+  - Handle `resize` and optional camera motion.
+- Update `src/ui/controls.js`:
+  - Subscribe to `sim:effectsUpdated` to render the info panel.
+  - Wire buttons to simulation methods and toggles.
+- Move creation of `EmotionalFace` out of simulation. It should subscribe to mood updates (via UI/controller) and accept `{ happiness, arousal, anxiety }` from `getMoodSummary()`.
+
+Acceptance (Phase 2): Simulation has no Three.js or DOM references; rendering and UI respond via events; app behavior matches Phase 1.
 
 ---
 
-## Step 6: Isolate UI Controls
-- Move all DOM event listeners, button handlers, and UI updates to `src/ui/controls.js`.
-- UI should communicate with the simulation via public methods or events.
+## Phase 3 — Simulation design improvements
+Solidify domain model and rules while staying decoupled.
+
+- Entities (in `src/models/`):
+  - `NeurotransmitterEntity`: `id`, `type`, `position`, `velocity`, `boundState`, flags for reuptake/degradation.
+  - `Receptor`: `id`, `position`, `occupied`, `affinityByType`.
+  - `Transporter`: `id`, `position`, `active`, `capacity`.
+  - `Enzyme`: `id`, `position`, `activity`, `specificity`.
+  - `Vesicle`: `id`, `position`, `contentType`, `quantity`.
+- Processes per tick (in `NeuronSimulation.update(dt)`):
+  - Diffusion with drift toward receptor plane; cleft bounds handling.
+  - Binding/unbinding via distance × affinity probabilities.
+  - Reuptake via proximity × type-specific rates; disabled when inhibited.
+  - Degradation via proximity to enzymes × type-specific rates.
+  - Vesicle trafficking and release; decrement vesicle contents.
+  - Mood calculation: use weights from `NEUROTRANSMITTER_TYPES` (e.g., `moodWeights: { happiness, arousal, anxiety }`) instead of switch statements.
+- APIs:
+  - `releaseNeurotransmitters(type: string, count?: number)`
+  - `setReuptakeInhibited(flag: boolean)`
+  - `reset()`
+  - `getSnapshot()` and `getMoodSummary()`
+  - `on(eventName, handler)` / `off(eventName, handler)` via the event bus
+
+Acceptance (Phase 3): Rules produce stable, predictable behavior; mood updates originate from simulation and are consumed by UI/EmotionalFace.
 
 ---
 
-## Step 7: Update Imports/Exports
-- Refactor all files to use ES6 `import`/`export` syntax.
-- Remove any global variables.
+## Phase 4 — Performance and lifecycle
+- Replace many repeated small meshes (lipids, enzymes, ECM) with `THREE.InstancedMesh`.
+- Object pooling for neurotransmitters and particles to reduce GC.
+- Throttle/debounce info panel DOM updates to ~10–20 Hz.
+- Ensure `dispose()` paths for all Three.js resources on `reset()` and page unload.
+- Avoid per-frame allocations inside hot loops.
+
+Acceptance (Phase 4): Frame time stable under burst releases; memory does not grow unbounded across resets.
 
 ---
 
-## Step 8: Add Utility Functions
-- Move any helper or utility functions to `src/utils/` as needed.
+## Phase 5 — Testing and verification
+- Add unit tests for pure simulation logic (no Three.js) using a lightweight runner or manual assertions.
+- Manual acceptance checklist:
+  - Releasing each neurotransmitter type works and shows correct description.
+  - Reuptake toggle visually and functionally changes clearance.
+  - Receptors change color correctly based on neurotransmitter polarity.
+  - Reset returns scene and state to initial conditions without leaks.
+  - Window resize preserves aspect and layout.
 
 ---
 
-## Step 9: Test and Debug
-- Test the application after each major step to ensure functionality is preserved.
-- Fix any issues that arise from the refactor.
+## Phase 6 — Cleanup and documentation
+- Remove dead code and unused imports.
+- Add JSDoc to public classes and methods.
+- Update `CLEAN_ARCHITECTURE_RULES.md` with any clarified conventions.
+- Update `README` with run instructions and architecture overview.
 
 ---
 
-## Step 10: Clean Up and Document
-- Remove any unused code or files.
-- Add JSDoc comments to all public classes and methods.
-- Update the README and architecture documentation as needed.
+## API changes summary (for implementers)
+- `NeuronSimulation`:
+  - `constructor(eventBus, config?)`
+  - `releaseNeurotransmitters(type: string, count?: number)`
+  - `setReuptakeInhibited(flag: boolean)`
+  - `reset()`
+  - `update(dt: number)`
+  - `getSnapshot()`, `getMoodSummary()`
+- Events (via event bus): `nt:released`, `nt:moved`, `nt:bound`, `nt:reuptaken`, `nt:degraded`, `sim:effectsUpdated`, `sim:reset`
+- `EmotionalFace.updateExpression(moodSummary)` receives `{ happiness, arousal, anxiety }`.
 
 ---
 
-**Tip:** Commit your changes after each step to make it easy to revert if needed. 
+## Implementation order (short checklist)
+1) Phase 1 quick fixes (polarity, particles, imports/vars, camera, resize, reset, DOM decouple).
+2) Phase 2 event bus + renderer split + UI wiring + face driven by mood.
+3) Phase 3 domain/entities/process refinements and mood weights.
+4) Phase 4 perf and lifecycle.
+5) Phase 5 tests and verification.
+6) Phase 6 cleanup and docs.
+
+Commit after each sub-step to ease rollback.

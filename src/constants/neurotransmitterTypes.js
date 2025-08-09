@@ -8,6 +8,8 @@ export const NEUROTRANSMITTER_TYPES = {
         speed: 0.12,
         size: 0.25,
         description: 'Reward and pleasure signaling',
+        polarity: 'EXCITATORY',
+        moodWeights: { happiness: 0.3, arousal: 0.2, anxiety: 0 },
         reuptakeRate: 0.8,
         maoSensitive: true,
         degradationRate: 0.6
@@ -18,6 +20,8 @@ export const NEUROTRANSMITTER_TYPES = {
         speed: 0.1,
         size: 0.22,
         description: 'Mood and emotional regulation',
+        polarity: 'INHIBITORY',
+        moodWeights: { happiness: 0.2, arousal: 0, anxiety: -0.3 },
         reuptakeRate: 0.7,
         maoSensitive: true,
         degradationRate: 0.7
@@ -28,6 +32,8 @@ export const NEUROTRANSMITTER_TYPES = {
         speed: 0.15,
         size: 0.2,
         description: 'Primary excitatory neurotransmitter',
+        polarity: 'EXCITATORY',
+        moodWeights: { happiness: 0, arousal: 0.2, anxiety: 0.05 },
         reuptakeRate: 0.9,
         maoSensitive: false,
         degradationRate: 0.3
@@ -38,6 +44,8 @@ export const NEUROTRANSMITTER_TYPES = {
         speed: 0.08,
         size: 0.23,
         description: 'Primary inhibitory neurotransmitter',
+        polarity: 'INHIBITORY',
+        moodWeights: { happiness: 0, arousal: -0.2, anxiety: -0.2 },
         reuptakeRate: 0.6,
         maoSensitive: false,
         degradationRate: 0.3
@@ -48,6 +56,8 @@ export const NEUROTRANSMITTER_TYPES = {
         speed: 0.13,
         size: 0.21,
         description: 'Arousal and attention',
+        polarity: 'EXCITATORY',
+        moodWeights: { happiness: 0, arousal: 0.3, anxiety: 0.2 },
         reuptakeRate: 0.75,
         maoSensitive: true,
         degradationRate: 0.65
