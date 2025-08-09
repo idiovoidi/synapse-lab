@@ -46,6 +46,15 @@ Organize code by responsibility:
 - The simulation layer exposes state changes (e.g., "release neurotransmitter", "bind to receptor").
 - The rendering layer listens for these changes and updates the 3D scene accordingly.
 
+### 6.1 Event Bus Convention
+- Use a lightweight event bus (`src/utils/eventBus.js`) with `on`, `off`, `emit`.
+- Core events: `nt:released`, `nt:moved`, `nt:bound`, `nt:reuptaken`, `nt:degraded`, `sim:reset`, `sim:effectsUpdated`, `sim:moodUpdated`.
+- UI subscribes to `sim:effectsUpdated` and `sim:moodUpdated`.
+
+### 6.2 Mood Summary Convention
+- Simulation computes a `moodSummary` object `{ happiness, arousal, anxiety }` using weights in `NEUROTRANSMITTER_TYPES.moodWeights`.
+- `EmotionalFace.updateExpression(moodSummary)` accepts this object.
+
 ---
 
 ## 7. Benefits

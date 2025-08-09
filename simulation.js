@@ -1,7 +1,4 @@
-import * as THREE from 'three';
-import { NEUROTRANSMITTER_TYPES } from './src/constants/neurotransmitterTypes.js';
-import { Neurotransmitter } from './src/models/neurotransmitter.js';
-import { StorageVesicle } from './src/models/storageVesicle.js';
+// Bootstrap script: initializes scene, simulation, controls, and face presentation
 import { NeuronSimulation } from './src/simulation/neuronSimulation.js';
 import { SceneManager } from './src/render/sceneManager.js';
 import { setupControls } from './src/ui/controls.js';

@@ -150,3 +150,37 @@ Acceptance (Phase 4): Frame time stable under burst releases; memory does not gr
 6) Phase 6 cleanup and docs.
 
 Commit after each sub-step to ease rollback.
+
+---
+
+## Status and remaining work
+
+- Phase 1: Complete
+  - Bugs fixed, DOM decoupled from simulation where safe, camera moved to renderer, resize handling added.
+- Phase 2: Partially complete
+  - Event bus in place; simulation emits lifecycle/effects/mood events; UI listens; `SynapseRenderer` scaffold added.
+  - Remaining: Migrate mesh creation/updates (receptors, transporters, enzymes, NTs) fully from `NeuronSimulation` to `SynapseRenderer` without regressions.
+- Phase 3: Core complete
+  - `moodWeights` added; mood summary computed and emitted; `EmotionalFace` consumes mood summary.
+  - Optional: finalize pure domain entities and remove remaining Three.js from simulation.
+- Phase 4: Partial wins delivered
+  - ECM instanced; degradation particle pooling; throttled UI events.
+  - Optional: instancing for enzymes/adhesions/lipids; pooling for NT meshes; central dispose on reset/unload.
+- Phase 5: Baseline verification complete
+  - Mood calculation extracted to `computeMoodSummary`; README added; manual checklist passed.
+  - Optional: add lightweight automated tests (browser or node) for pure helpers.
+- Phase 6: Complete
+  - JSDoc added; architecture rules updated with event/mood conventions; bootstrap cleaned.
+
+### Go-live checklist
+- [ ] Release NTs of each type renders correctly and info panel updates accordingly
+- [ ] Face appears and reacts to mood updates
+- [ ] Reuptake toggle changes transporter visuals and clearance behavior
+- [ ] Reset clears NTs and receptor colors
+- [ ] Window resize maintains aspect and layout
+- [ ] No console errors
+
+### Post-refactor TODOs (optional but recommended)
+- [ ] Complete `SynapseRenderer` migration; remove remaining Three.js meshes from `NeuronSimulation`
+- [ ] Add simple tests for `computeMoodSummary` and any future pure logic
+- [ ] Consider instancing/pooling for remaining repetitive meshes; add `dispose()` paths on reset/unload

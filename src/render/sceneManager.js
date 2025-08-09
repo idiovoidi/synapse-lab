@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+/**
+ * Manages the Three.js scene, camera, renderer, and animation loop.
+ */
 export class SceneManager {
     constructor() {
         this.scene = new THREE.Scene();
@@ -45,6 +48,10 @@ export class SceneManager {
         this.renderer.render(this.scene, this.camera);
     }
 
+    /**
+     * Starts the render loop and calls updateCallback each frame before rendering.
+     * @param {() => void} updateCallback
+     */
     startAnimationLoop(updateCallback) {
         const animate = () => {
             updateCallback();

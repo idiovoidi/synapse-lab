@@ -2,14 +2,31 @@ import * as THREE from 'three';
 import { NEUROTRANSMITTER_TYPES } from '../constants/neurotransmitterTypes.js';
 import { StorageVesicle } from '../models/storageVesicle.js';
 import { Neurotransmitter } from '../models/neurotransmitter.js';
+import { computeMoodSummary } from './mood.js';
 
+/**
+ * Orchestrates neurotransmitter simulation and emits UI/rendering events.
+ * Still contains rendering objects pending full renderer split (Phase 2 follow-up).
+ */
 export class NeuronSimulation {
+    /**
+     * @param {import('../render/sceneManager.js').SceneManager} sceneManager
+     * @param {{on?:Function, off?:Function, emit?:Function}|null} eventBus
+     */
     constructor(sceneManager, eventBus = null) {
         this.sceneManager = sceneManager;
         this.scene = sceneManager.scene;
         this.camera = sceneManager.camera;
         this.renderer = sceneManager.renderer;
         this.eventBus = eventBus;
+        this._lastEffectsEmitMs = 0;
+        this.degradationParticlePool = [];
+        this.degradationParticleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+        this.degradationParticleMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff4444,
+            transparent: true,
+            opacity: 0.5
+        });
 
         // Initialize properties
         this.neurotransmitters = [];
@@ -467,27 +484,24 @@ export class NeuronSimulation {
     }
 
     createExtracellularMatrix() {
-        const matrixGeometry = new THREE.SphereGeometry(0.05, 8, 8);
-        const matrixMaterial = new THREE.MeshPhongMaterial({
-            color: 0x88aaff,
-            transparent: true,
-            opacity: 0.3
-        });
-
-        // Add matrix proteins throughout the cleft
-        for (let i = 0; i < 50; i++) {
-            const matrix = new THREE.Mesh(matrixGeometry, matrixMaterial);
+        const count = 50;
+        const geo = new THREE.SphereGeometry(0.05, 8, 8);
+        const mat = new THREE.MeshPhongMaterial({ color: 0x88aaff, transparent: true, opacity: 0.3 });
+        const instanced = new THREE.InstancedMesh(geo, mat, count);
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < count; i++) {
             const angle = Math.random() * Math.PI * 2;
             const radius = Math.random() * 2;
-            
-            matrix.position.set(
+            dummy.position.set(
                 Math.random() * 0.8 - 0.4,
                 Math.sin(angle) * radius,
                 Math.cos(angle) * radius
             );
-            
-            this.synapticCleft.add(matrix);
+            dummy.updateMatrix();
+            instanced.setMatrixAt(i, dummy.matrix);
         }
+        instanced.instanceMatrix.needsUpdate = true;
+        this.synapticCleft.add(instanced);
     }
 
     createAdhesionMolecules() {
@@ -583,15 +597,7 @@ export class NeuronSimulation {
         });
 
         // Compute mood summary for EmotionalFace and UI consumers
-        const mood = { happiness: 0, arousal: 0, anxiety: 0 };
-        this.neurotransmitters.forEach(nt => {
-            const w = NEUROTRANSMITTER_TYPES[nt.type]?.moodWeights;
-            if (!w) return;
-            mood.happiness += w.happiness || 0;
-            mood.arousal += w.arousal || 0;
-            mood.anxiety += w.anxiety || 0;
-        });
-        this.moodSummary = mood;
+        this.moodSummary = computeMoodSummary(this.neurotransmitters);
 
         if (this.eventBus) {
             this.eventBus.emit('sim:effectsUpdated', this.latestEffects);
@@ -735,14 +741,13 @@ export class NeuronSimulation {
     }
 
     createDegradationParticle(position) {
-        const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-        const particleMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff4444,
-            transparent: true,
-            opacity: 0.5
-        });
-        
-        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+        let particle = this.degradationParticlePool.pop();
+        if (particle) {
+            particle.visible = true;
+            particle.material.opacity = 0.5;
+        } else {
+            particle = new THREE.Mesh(this.degradationParticleGeometry, this.degradationParticleMaterial);
+        }
         particle.position.copy(position);
         
         // Add random velocity
@@ -761,9 +766,8 @@ export class NeuronSimulation {
                 particle.material.opacity = 0.5 * (1 - progress);
                 requestAnimationFrame(() => animate(progress + 0.05));
             } else {
-                this.scene.remove(particle);
-                if (particle.geometry) particle.geometry.dispose();
-                if (particle.material) particle.material.dispose();
+                particle.visible = false;
+                this.degradationParticlePool.push(particle);
             }
         };
         
