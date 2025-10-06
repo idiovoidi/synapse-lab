@@ -1,97 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Neurotransmitter Simulation</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #1a1a1a;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
-        }
-        #info {
-            position: absolute;
-            top: 10px;
-            width: 100%;
-            text-align: center;
-            z-index: 100;
-            pointer-events: none;
-        }
-        .controls {
-            position: absolute;
-            bottom: 20px;
-            width: 100%;
-            text-align: center;
-            z-index: 100;
-        }
-        button, select {
-            background: #333;
-            color: #fff;
-            border: 1px solid #444;
-            padding: 8px 15px;
-            border-radius: 4px;
-            margin: 0 5px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #444;
-        }
-        #inhibitBtn {
-            margin-top: 10px;
-            padding: 10px 20px;
-            transition: background-color 0.3s;
-        }
-        #inhibitBtn:hover {
-            background: #444;
-        }
-        .info-panel {
-            position: absolute;
-            top: 80px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 5px;
-            max-width: 250px;
-        }
-        #effects {
-            font-size: 14px;
-            line-height: 1.4;
-        }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #1a1a1a;
+        color: #ffffff;
+        font-family: Arial, sans-serif;
+      }
+      #info {
+        position: absolute;
+        top: 10px;
+        width: 100%;
+        text-align: center;
+        z-index: 100;
+        pointer-events: none;
+      }
+      .controls {
+        position: absolute;
+        bottom: 20px;
+        width: 100%;
+        text-align: center;
+        z-index: 100;
+      }
+      button,
+      select {
+        background: #333;
+        color: #fff;
+        border: 1px solid #444;
+        padding: 8px 15px;
+        border-radius: 4px;
+        margin: 0 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #444;
+      }
+      #inhibitBtn {
+        margin-top: 10px;
+        padding: 10px 20px;
+        transition: background-color 0.3s;
+      }
+      #inhibitBtn:hover {
+        background: #444;
+      }
+      .info-panel {
+        position: absolute;
+        top: 80px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px;
+        border-radius: 5px;
+        max-width: 250px;
+      }
+      #effects {
+        font-size: 14px;
+        line-height: 1.4;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="info">
-        <h2>Neurotransmitter Simulation</h2>
-        <p>Blue: Excitatory | Green: Inhibitory</p>
+      <h2>Neurotransmitter Simulation</h2>
+      <p>Blue: Excitatory | Green: Inhibitory</p>
     </div>
-    
+
     <div class="controls">
-        <select id="ntType">
-            <option value="DOPAMINE">Dopamine (Reward)</option>
-            <option value="SEROTONIN">Serotonin (Mood)</option>
-            <option value="GLUTAMATE">Glutamate (Excitatory)</option>
-            <option value="GABA">GABA (Inhibitory)</option>
-            <option value="NOREPINEPHRINE">Norepinephrine (Arousal)</option>
-        </select>
-        <button id="releaseBtn">Release Neurotransmitters</button>
-        <button id="resetBtn">Reset</button>
+      <select id="ntType">
+        <option value="DOPAMINE">Dopamine (Reward)</option>
+        <option value="SEROTONIN">Serotonin (Mood)</option>
+        <option value="GLUTAMATE">Glutamate (Excitatory)</option>
+        <option value="GABA">GABA (Inhibitory)</option>
+        <option value="NOREPINEPHRINE">Norepinephrine (Arousal)</option>
+      </select>
+      <button id="releaseBtn">Release Neurotransmitters</button>
+      <button id="resetBtn">Reset</button>
     </div>
     <div class="info-panel">
-        <h3>Current Effects:</h3>
-        <div id="effects"></div>
+      <h3>Current Effects:</h3>
+      <div id="effects"></div>
     </div>
 
     <script type="importmap">
-    {
+      {
         "imports": {
-            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
-            "three/examples/jsm/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+          "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+          "three/examples/jsm/": "https://unpkg.com/three@0.159.0/examples/jsm/"
         }
-    }
+      }
     </script>
     <script type="module" src="simulation.js"></script>
-</body>
-</html> 
+  </body>
+</html>
