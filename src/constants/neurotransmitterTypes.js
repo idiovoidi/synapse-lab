@@ -9,7 +9,7 @@ export const NEUROTRANSMITTER_TYPES = {
         size: 0.3,
         description: 'Reward and pleasure signaling',
         polarity: 'EXCITATORY',
-        moodWeights: { happiness: 0.3, arousal: 0.2, anxiety: 0 },
+        moodWeights: { happiness: 0.5, arousal: 0.3, anxiety: 0 },
         reuptakeRate: 0.8,
         maoSensitive: true,
         degradationRate: 0.6

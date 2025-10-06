@@ -26,6 +26,16 @@
         width: 100%;
         text-align: center;
         z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .controls > div {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        justify-content: center;
       }
       button,
       select {
@@ -36,9 +46,17 @@
         border-radius: 4px;
         margin: 0 5px;
         cursor: pointer;
+        transition: all 0.3s;
       }
       button:hover {
         background: #444;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      }
+      #viewBtn {
+        font-size: 16px;
+        padding: 10px 20px;
+        border: 2px solid #6688ff;
       }
       #inhibitBtn {
         margin-top: 10px;
@@ -70,15 +88,20 @@
     </div>
 
     <div class="controls">
-      <select id="ntType">
-        <option value="DOPAMINE">Dopamine (Reward)</option>
-        <option value="SEROTONIN">Serotonin (Mood)</option>
-        <option value="GLUTAMATE">Glutamate (Excitatory)</option>
-        <option value="GABA">GABA (Inhibitory)</option>
-        <option value="NOREPINEPHRINE">Norepinephrine (Arousal)</option>
-      </select>
-      <button id="releaseBtn">Release Neurotransmitters</button>
-      <button id="resetBtn">Reset</button>
+      <div>
+        <!-- View button will be inserted here by JavaScript -->
+      </div>
+      <div>
+        <select id="ntType">
+          <option value="DOPAMINE">Dopamine (Reward)</option>
+          <option value="SEROTONIN">Serotonin (Mood)</option>
+          <option value="GLUTAMATE">Glutamate (Excitatory)</option>
+          <option value="GABA">GABA (Inhibitory)</option>
+          <option value="NOREPINEPHRINE">Norepinephrine (Arousal)</option>
+        </select>
+        <button id="releaseBtn">🚀 Release Neurotransmitters</button>
+        <button id="resetBtn">🔄 Reset</button>
+      </div>
     </div>
     <div class="info-panel">
       <h3>Current Effects:</h3>
