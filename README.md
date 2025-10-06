@@ -1,6 +1,6 @@
 # Neurotransmitter Simulation
 
-Run via a static server and open `index.html`. Requires a modern browser with ES modules.
+A p via a static server and open `index.html`. Requires a modern browser with ES modules.
 
 ## Structure
 - `src/constants/`: neurotransmitter definitions and config

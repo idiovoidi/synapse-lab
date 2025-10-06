@@ -7,10 +7,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 export class SceneManager {
     constructor() {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1a1a1a);
+        // Darker, more professional background with subtle gradient
+        this.scene.background = new THREE.Color(0x0a0a0f);
+        this.scene.fog = new THREE.Fog(0x0a0a0f, 30, 100);
 
         this.camera = new THREE.PerspectiveCamera(
-            75,
+            60, // Slightly narrower FOV for less distortion
             window.innerWidth / window.innerHeight,
             0.1,
             1000
@@ -19,8 +21,17 @@ export class SceneManager {
         this.camera.position.set(0, 8, 25);
         this.camera.lookAt(0, 0, 0);
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: false,
+            powerPreference: "high-performance"
+        });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.2;
         document.body.appendChild(this.renderer.domElement);
 
         // Handle resize
@@ -30,20 +41,49 @@ export class SceneManager {
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Add lights
-        const ambientLight = new THREE.AmbientLight(0x404040);
+        // Enhanced lighting setup
+        const ambientLight = new THREE.AmbientLight(0x333344, 0.4);
         this.scene.add(ambientLight);
-        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
-        mainLight.position.set(10, 10, 10);
+        
+        // Main key light (from top-right)
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        mainLight.position.set(15, 15, 15);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 50;
         this.scene.add(mainLight);
+        
+        // Fill light (from left, cooler tone)
+        const fillLight = new THREE.DirectionalLight(0x6688ff, 0.5);
+        fillLight.position.set(-10, 5, 10);
+        this.scene.add(fillLight);
+        
+        // Rim light (from behind, warm tone)
+        const rimLight = new THREE.DirectionalLight(0xffaa88, 0.6);
+        rimLight.position.set(0, 5, -15);
+        this.scene.add(rimLight);
+        
+        // Spotlight on synaptic cleft
+        const spotLight = new THREE.SpotLight(0x88aaff, 0.8);
+        spotLight.position.set(0, 10, 0);
+        spotLight.angle = Math.PI / 6;
+        spotLight.penumbra = 0.3;
+        spotLight.decay = 2;
+        spotLight.distance = 30;
+        this.scene.add(spotLight);
 
-        // Orbit controls
+        // Orbit controls with better constraints
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.08;
-        this.controls.minDistance = 10;
-        this.controls.maxDistance = 120;
+        this.controls.minDistance = 12;
+        this.controls.maxDistance = 60;
+        this.controls.maxPolarAngle = Math.PI * 0.75; // Prevent going below
         this.controls.target.set(0, 0, 0);
+        this.controls.autoRotate = false;
+        this.controls.autoRotateSpeed = 0.5;
         this.controls.update();
     }
 

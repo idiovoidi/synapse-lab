@@ -53,23 +53,33 @@ export class NeuronSimulation {
     }
 
     createNeurons() {
-        // Create cell body (soma) for presynaptic neuron
+        // Create cell body (soma) for presynaptic neuron with better material
         const somaGeometry = new THREE.SphereGeometry(3, 32, 32);
-        const somaMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffcc88,
+        const somaMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffbb77,
             transparent: true,
-            opacity: 0.9
+            opacity: 0.85,
+            roughness: 0.4,
+            metalness: 0.1,
+            emissive: 0x442200,
+            emissiveIntensity: 0.1
         });
         this.preSoma = new THREE.Mesh(somaGeometry, somaMaterial);
         this.preSoma.position.set(-15, 0, 0);
+        this.preSoma.castShadow = true;
+        this.preSoma.receiveShadow = true;
         this.scene.add(this.preSoma);
 
-        // Create nucleus
+        // Create nucleus with better material
         const nucleusGeometry = new THREE.SphereGeometry(1, 24, 24);
-        const nucleusMaterial = new THREE.MeshPhongMaterial({
-            color: 0x4444aa,
+        const nucleusMaterial = new THREE.MeshStandardMaterial({
+            color: 0x5555cc,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.9,
+            roughness: 0.3,
+            metalness: 0.2,
+            emissive: 0x222266,
+            emissiveIntensity: 0.3
         });
         const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
         this.preSoma.add(nucleus);
@@ -81,12 +91,32 @@ export class NeuronSimulation {
         this.createDendrites(this.preSoma, 6);
 
         // Create postsynaptic neuron
-        this.postSoma = new THREE.Mesh(somaGeometry.clone(), somaMaterial.clone());
+        const postSomaMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffbb77,
+            transparent: true,
+            opacity: 0.85,
+            roughness: 0.4,
+            metalness: 0.1,
+            emissive: 0x442200,
+            emissiveIntensity: 0.1
+        });
+        this.postSoma = new THREE.Mesh(somaGeometry.clone(), postSomaMaterial);
         this.postSoma.position.set(15, 0, 0);
+        this.postSoma.castShadow = true;
+        this.postSoma.receiveShadow = true;
         this.scene.add(this.postSoma);
 
         // Add nucleus to postsynaptic neuron
-        const postNucleus = nucleus.clone();
+        const postNucleusMaterial = new THREE.MeshStandardMaterial({
+            color: 0x5555cc,
+            transparent: true,
+            opacity: 0.9,
+            roughness: 0.3,
+            metalness: 0.2,
+            emissive: 0x222266,
+            emissiveIntensity: 0.3
+        });
+        const postNucleus = new THREE.Mesh(nucleusGeometry.clone(), postNucleusMaterial);
         this.postSoma.add(postNucleus);
 
         // Create dendrites for postsynaptic neuron
@@ -112,13 +142,19 @@ export class NeuronSimulation {
             false // closed
         );
 
-        const axonMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffcc88,
+        const axonMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffbb77,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.85,
+            roughness: 0.5,
+            metalness: 0.05,
+            emissive: 0x442200,
+            emissiveIntensity: 0.05
         });
 
         this.axon = new THREE.Mesh(axonGeometry, axonMaterial);
+        this.axon.castShadow = true;
+        this.axon.receiveShadow = true;
         this.scene.add(this.axon);
 
         // Add myelin sheaths
@@ -126,10 +162,14 @@ export class NeuronSimulation {
     }
 
     createMyelinSheaths(axonPoints) {
-        const myelinMaterial = new THREE.MeshPhongMaterial({
+        const myelinMaterial = new THREE.MeshStandardMaterial({
             color: 0xffffff,
             transparent: true,
-            opacity: 0.5
+            opacity: 0.7,
+            roughness: 0.2,
+            metalness: 0.3,
+            emissive: 0xccccff,
+            emissiveIntensity: 0.1
         });
 
         // Create myelin segments along the axon
@@ -158,10 +198,14 @@ export class NeuronSimulation {
     }
 
     createDendrites(soma, count) {
-        const dendriteMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffcc88,
+        const dendriteMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffbb77,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.75,
+            roughness: 0.6,
+            metalness: 0.05,
+            emissive: 0x442200,
+            emissiveIntensity: 0.05
         });
 
         for (let i = 0; i < count; i++) {
@@ -226,29 +270,54 @@ export class NeuronSimulation {
         const startY = -3.5;
 
         for (let i = 0; i < receptorCount; i++) {
-            const receptorGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-            const receptorMaterial = new THREE.MeshPhongMaterial({
+            // Create more complex receptor shape (Y-shaped)
+            const receptorGroup = new THREE.Group();
+            
+            // Base (transmembrane domain)
+            const baseGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.5, 8);
+            const baseMaterial = new THREE.MeshStandardMaterial({
                 color: 0x666666,
-                shininess: 100,
+                roughness: 0.4,
+                metalness: 0.6,
                 emissive: 0x222222,
                 emissiveIntensity: 0.3
             });
-            const receptor = new THREE.Mesh(receptorGeometry, receptorMaterial);
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.rotation.z = Math.PI / 2;
+            receptorGroup.add(base);
             
-            receptor.position.set(
+            // Binding site (extracellular domain)
+            const bindingSiteGeometry = new THREE.SphereGeometry(0.25, 12, 12);
+            const bindingSiteMaterial = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                roughness: 0.3,
+                metalness: 0.5,
+                emissive: 0x333333,
+                emissiveIntensity: 0.4
+            });
+            const bindingSite = new THREE.Mesh(bindingSiteGeometry, bindingSiteMaterial);
+            bindingSite.position.x = -0.3;
+            receptorGroup.add(bindingSite);
+            
+            receptorGroup.position.set(
                 startX,
                 startY + (i * spacing),
-                (Math.random() - 0.5) * 0.5 // Slight depth variation
+                (Math.random() - 0.5) * 0.5
             );
-            receptor.occupied = false;
-            receptor.rotation.set(
-                Math.random() * 0.2,
-                Math.random() * 0.2,
-                Math.random() * 0.2
+            receptorGroup.rotation.set(
+                Math.random() * 0.15,
+                Math.random() * 0.15,
+                Math.random() * 0.15
             );
             
-            this.receptors.push(receptor);
-            this.scene.add(receptor);
+            receptorGroup.occupied = false;
+            receptorGroup.baseMaterial = baseMaterial;
+            receptorGroup.bindingSiteMaterial = bindingSiteMaterial;
+            receptorGroup.castShadow = true;
+            receptorGroup.receiveShadow = true;
+            
+            this.receptors.push(receptorGroup);
+            this.scene.add(receptorGroup);
         }
     }
 
@@ -330,9 +399,12 @@ export class NeuronSimulation {
         this.receptors.forEach(receptor => {
             receptor.occupied = false;
             receptor.boundNT = null;
-            receptor.material.color.setHex(0x666666);
-            receptor.material.emissive.setHex(0x222222);
-            receptor.material.emissiveIntensity = 0.3;
+            receptor.baseMaterial.color.setHex(0x666666);
+            receptor.baseMaterial.emissive.setHex(0x222222);
+            receptor.baseMaterial.emissiveIntensity = 0.3;
+            receptor.bindingSiteMaterial.color.setHex(0x888888);
+            receptor.bindingSiteMaterial.emissive.setHex(0x333333);
+            receptor.bindingSiteMaterial.emissiveIntensity = 0.4;
         });
         
         // Emit reset event
@@ -356,9 +428,12 @@ export class NeuronSimulation {
                             // Color receptor based on polarity
                             const polarity = NEUROTRANSMITTER_TYPES[nt.type]?.polarity;
                             const color = polarity === 'EXCITATORY' ? 0xff6666 : 0x66ff66;
-                            receptor.material.color.setHex(color);
-                            receptor.material.emissive.setHex(color);
-                            receptor.material.emissiveIntensity = 0.5;
+                            receptor.baseMaterial.color.setHex(color);
+                            receptor.baseMaterial.emissive.setHex(color);
+                            receptor.baseMaterial.emissiveIntensity = 0.7;
+                            receptor.bindingSiteMaterial.color.setHex(color);
+                            receptor.bindingSiteMaterial.emissive.setHex(color);
+                            receptor.bindingSiteMaterial.emissiveIntensity = 0.8;
                             
                             // Make bound NT glow brighter
                             nt.mesh.material.emissiveIntensity = 0.6;
@@ -379,9 +454,12 @@ export class NeuronSimulation {
                     if (receptor) {
                         receptor.occupied = false;
                         receptor.boundNT = null;
-                        receptor.material.color.setHex(0x666666);
-                        receptor.material.emissive.setHex(0x222222);
-                        receptor.material.emissiveIntensity = 0.3;
+                        receptor.baseMaterial.color.setHex(0x666666);
+                        receptor.baseMaterial.emissive.setHex(0x222222);
+                        receptor.baseMaterial.emissiveIntensity = 0.3;
+                        receptor.bindingSiteMaterial.color.setHex(0x888888);
+                        receptor.bindingSiteMaterial.emissive.setHex(0x333333);
+                        receptor.bindingSiteMaterial.emissiveIntensity = 0.4;
                     }
                     
                     nt.bound = false;
@@ -402,42 +480,73 @@ export class NeuronSimulation {
     }
 
     createSynapticStructure() {
-        // Create axon terminal (bulb-like structure as shown in diagram)
+        // Create axon terminal (bulb-like structure) with better material
         const terminalGeometry = new THREE.SphereGeometry(2.5, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.7);
-        const neuronMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffcc88, // More yellow/orange like in diagram
+        const terminalMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffbb77,
             transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
+            opacity: 0.85,
+            side: THREE.DoubleSide,
+            roughness: 0.4,
+            metalness: 0.1,
+            emissive: 0x442200,
+            emissiveIntensity: 0.15
         });
-        this.axonTerminal = new THREE.Mesh(terminalGeometry, neuronMaterial);
+        this.axonTerminal = new THREE.Mesh(terminalGeometry, terminalMaterial);
         this.axonTerminal.position.x = -5;
+        this.axonTerminal.castShadow = true;
+        this.axonTerminal.receiveShadow = true;
         
         // Add flow particles in terminal
         this.createAxonalFlow();
         
         this.scene.add(this.axonTerminal);
 
-        // Create dendrite terminal (receiving end)
+        // Create dendrite terminal (receiving end) with better material
         const dendriteGeometry = new THREE.SphereGeometry(2.5, 32, 32);
-        this.dendrite = new THREE.Mesh(dendriteGeometry, neuronMaterial);
+        const dendriteMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffbb77,
+            transparent: true,
+            opacity: 0.85,
+            roughness: 0.4,
+            metalness: 0.1,
+            emissive: 0x442200,
+            emissiveIntensity: 0.15
+        });
+        this.dendrite = new THREE.Mesh(dendriteGeometry, dendriteMaterial);
         this.dendrite.position.x = 5;
+        this.dendrite.castShadow = true;
+        this.dendrite.receiveShadow = true;
         this.scene.add(this.dendrite);
 
-        // Create more detailed synaptic cleft with activity indicator
-        const cleftGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.8, 32, 5, true);
-        const cleftMaterial = new THREE.MeshPhongMaterial({
-            color: 0xaaaaff,
+        // Create more detailed synaptic cleft with better visualization
+        const cleftGeometry = new THREE.CylinderGeometry(2.8, 2.8, 0.8, 32, 5, true);
+        const cleftMaterial = new THREE.MeshStandardMaterial({
+            color: 0x88aaff,
             transparent: true,
-            opacity: 0.1,
+            opacity: 0.15,
             side: THREE.DoubleSide,
-            wireframe: true,
-            emissive: 0x4444ff,
+            wireframe: false,
+            roughness: 0.8,
+            metalness: 0.2,
+            emissive: 0x4466ff,
             emissiveIntensity: 0
         });
         this.synapticCleft = new THREE.Mesh(cleftGeometry, cleftMaterial);
         this.synapticCleft.rotation.z = Math.PI / 2;
         this.scene.add(this.synapticCleft);
+        
+        // Add wireframe overlay for better depth perception
+        const wireframeGeometry = cleftGeometry.clone();
+        const wireframeMaterial = new THREE.MeshBasicMaterial({
+            color: 0x6688ff,
+            transparent: true,
+            opacity: 0.2,
+            wireframe: true
+        });
+        const wireframe = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
+        wireframe.rotation.z = Math.PI / 2;
+        this.scene.add(wireframe);
 
         // Add extracellular matrix elements in the cleft
         this.createExtracellularMatrix();
@@ -450,33 +559,57 @@ export class NeuronSimulation {
     }
 
     createReuptakeTransporters() {
-        const transporterCount = 6;
+        const transporterCount = 8;
         this.transporters = [];
         
         for (let i = 0; i < transporterCount; i++) {
-            const transporterGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.4, 8);
-            const transporterMaterial = new THREE.MeshPhongMaterial({
-                color: 0xff9933, // Orange color for transporters
-                transparent: true,
-                opacity: 0.8
-            });
+            // Create more detailed transporter (channel-like structure)
+            const transporterGroup = new THREE.Group();
             
-            const transporter = new THREE.Mesh(transporterGeometry, transporterMaterial);
+            // Main channel body
+            const channelGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.5, 8);
+            const channelMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff9933,
+                transparent: true,
+                opacity: 0.85,
+                roughness: 0.3,
+                metalness: 0.6,
+                emissive: 0x884400,
+                emissiveIntensity: 0.3
+            });
+            const channel = new THREE.Mesh(channelGeometry, channelMaterial);
+            transporterGroup.add(channel);
+            
+            // Opening indicator
+            const openingGeometry = new THREE.TorusGeometry(0.12, 0.04, 8, 12);
+            const openingMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffbb55,
+                emissive: 0xaa6600,
+                emissiveIntensity: 0.5,
+                roughness: 0.2,
+                metalness: 0.7
+            });
+            const opening = new THREE.Mesh(openingGeometry, openingMaterial);
+            opening.rotation.x = Math.PI / 2;
+            transporterGroup.add(opening);
             
             // Position transporters along both pre and post synaptic membranes
-            const angle = (i / transporterCount) * Math.PI;
+            const angle = (i / transporterCount) * Math.PI * 2;
             const isPresynaptic = i % 2 === 0;
             
-            transporter.position.set(
+            transporterGroup.position.set(
                 isPresynaptic ? -3.5 : 3.5,
-                Math.sin(angle) * 2,
-                Math.cos(angle) * 2
+                Math.sin(angle) * 2.2,
+                Math.cos(angle) * 2.2
             );
             
-            transporter.rotation.z = isPresynaptic ? Math.PI / 2 : -Math.PI / 2;
+            transporterGroup.rotation.z = isPresynaptic ? Math.PI / 2 : -Math.PI / 2;
+            transporterGroup.channelMaterial = channelMaterial;
+            transporterGroup.castShadow = true;
+            transporterGroup.receiveShadow = true;
             
-            this.transporters.push(transporter);
-            this.scene.add(transporter);
+            this.transporters.push(transporterGroup);
+            this.scene.add(transporterGroup);
         }
     }
 
@@ -571,26 +704,54 @@ export class NeuronSimulation {
     }
 
     createAdhesionMolecules() {
-        const adhesionGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
-        const adhesionMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff88aa,
-            transparent: true,
-            opacity: 0.5
-        });
-
-        // Create adhesion molecules around the cleft periphery
-        for (let i = 0; i < 8; i++) {
-            const adhesion = new THREE.Mesh(adhesionGeometry, adhesionMaterial);
-            const angle = (i / 8) * Math.PI * 2;
-            const radius = 2.3;
+        const adhesionCount = 12;
+        
+        for (let i = 0; i < adhesionCount; i++) {
+            // Create adhesion molecule as a chain
+            const adhesionGroup = new THREE.Group();
             
-            adhesion.position.set(
+            // Main strand
+            const strandGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.8, 8);
+            const strandMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff88aa,
+                transparent: true,
+                opacity: 0.6,
+                roughness: 0.5,
+                metalness: 0.3,
+                emissive: 0x884455,
+                emissiveIntensity: 0.2
+            });
+            const strand = new THREE.Mesh(strandGeometry, strandMaterial);
+            adhesionGroup.add(strand);
+            
+            // Binding domains at ends
+            const domainGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+            const domainMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffaacc,
+                emissive: 0xaa6688,
+                emissiveIntensity: 0.3,
+                roughness: 0.4,
+                metalness: 0.4
+            });
+            
+            const topDomain = new THREE.Mesh(domainGeometry, domainMaterial);
+            topDomain.position.y = 0.4;
+            adhesionGroup.add(topDomain);
+            
+            const bottomDomain = new THREE.Mesh(domainGeometry, domainMaterial);
+            bottomDomain.position.y = -0.4;
+            adhesionGroup.add(bottomDomain);
+            
+            const angle = (i / adhesionCount) * Math.PI * 2;
+            const radius = 2.5;
+            
+            adhesionGroup.position.set(
                 0,
                 Math.sin(angle) * radius,
                 Math.cos(angle) * radius
             );
             
-            this.synapticCleft.add(adhesion);
+            this.synapticCleft.add(adhesionGroup);
         }
     }
 
@@ -599,10 +760,14 @@ export class NeuronSimulation {
         
         // Visual feedback for inhibition state
         this.transporters.forEach(transporter => {
-            transporter.material.color.setHex(
+            transporter.channelMaterial.color.setHex(
                 this.reuptakeInhibited ? 0xff0000 : 0xff9933
             );
-            transporter.material.opacity = this.reuptakeInhibited ? 0.4 : 0.8;
+            transporter.channelMaterial.emissive.setHex(
+                this.reuptakeInhibited ? 0xaa0000 : 0x884400
+            );
+            transporter.channelMaterial.emissiveIntensity = this.reuptakeInhibited ? 0.8 : 0.3;
+            transporter.channelMaterial.opacity = this.reuptakeInhibited ? 0.6 : 0.85;
         });
     }
 
@@ -699,11 +864,15 @@ export class NeuronSimulation {
     createAxonalFlow() {
         const flowParticles = new THREE.Group();
         const particleCount = 20;
-        const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-        const particleMaterial = new THREE.MeshPhongMaterial({
+        const particleGeometry = new THREE.SphereGeometry(0.1, 12, 12);
+        const particleMaterial = new THREE.MeshStandardMaterial({
             color: 0x88aaff,
             transparent: true,
-            opacity: 0.6
+            opacity: 0.7,
+            roughness: 0.3,
+            metalness: 0.5,
+            emissive: 0x4466ff,
+            emissiveIntensity: 0.4
         });
 
         for (let i = 0; i < particleCount; i++) {
@@ -734,34 +903,61 @@ export class NeuronSimulation {
 
     createMAOEnzymes() {
         const enzymeCount = 15;
-        const enzymeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
-        const enzymeMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff6666,
-            transparent: true,
-            opacity: 0.7,
-            emissive: 0xff4444,
-            emissiveIntensity: 0.3
-        });
-
+        
         for (let i = 0; i < enzymeCount; i++) {
-            const enzyme = new THREE.Mesh(enzymeGeometry, enzymeMaterial);
+            // Create enzyme as a group with multiple parts
+            const enzymeGroup = new THREE.Group();
+            
+            // Core
+            const coreGeometry = new THREE.SphereGeometry(0.18, 12, 12);
+            const coreMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff6666,
+                transparent: true,
+                opacity: 0.8,
+                roughness: 0.4,
+                metalness: 0.3,
+                emissive: 0xff4444,
+                emissiveIntensity: 0.5
+            });
+            const core = new THREE.Mesh(coreGeometry, coreMaterial);
+            enzymeGroup.add(core);
+            
+            // Active site indicators (small protrusions)
+            for (let j = 0; j < 3; j++) {
+                const siteGeometry = new THREE.SphereGeometry(0.06, 8, 8);
+                const siteMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xffaa88,
+                    emissive: 0xff6644,
+                    emissiveIntensity: 0.7,
+                    roughness: 0.2,
+                    metalness: 0.5
+                });
+                const site = new THREE.Mesh(siteGeometry, siteMaterial);
+                const siteAngle = (j / 3) * Math.PI * 2;
+                site.position.set(
+                    Math.cos(siteAngle) * 0.15,
+                    Math.sin(siteAngle) * 0.15,
+                    0
+                );
+                enzymeGroup.add(site);
+            }
             
             // Position enzymes around synaptic area
             const angle = (i / enzymeCount) * Math.PI * 2;
             const radius = 3 + Math.random();
-            const height = Math.random() * 2 - 1;
             
-            enzyme.position.set(
+            enzymeGroup.position.set(
                 0,
                 Math.sin(angle) * radius,
                 Math.cos(angle) * radius
             );
             
-            enzyme.userData.originalPos = enzyme.position.clone();
-            enzyme.userData.phase = Math.random() * Math.PI * 2;
+            enzymeGroup.userData.originalPos = enzymeGroup.position.clone();
+            enzymeGroup.userData.phase = Math.random() * Math.PI * 2;
+            enzymeGroup.castShadow = true;
             
-            this.maoEnzymes.push(enzyme);
-            this.scene.add(enzyme);
+            this.maoEnzymes.push(enzymeGroup);
+            this.scene.add(enzymeGroup);
         }
     }
 

@@ -4,16 +4,21 @@ import { NEUROTRANSMITTER_TYPES } from '../constants/neurotransmitterTypes.js';
 export class Neurotransmitter {
     constructor(position, type) {
         const ntProperties = NEUROTRANSMITTER_TYPES[type];
-        const geometry = new THREE.SphereGeometry(ntProperties.size, 16, 16);
-        const material = new THREE.MeshPhongMaterial({
+        const geometry = new THREE.SphereGeometry(ntProperties.size, 20, 20);
+        const material = new THREE.MeshStandardMaterial({
             color: ntProperties.color,
-            shininess: 100,
+            roughness: 0.3,
+            metalness: 0.4,
             emissive: ntProperties.color,
-            emissiveIntensity: 0.2
+            emissiveIntensity: 0.2,
+            transparent: true,
+            opacity: 0.95
         });
         
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.copy(position);
+        this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
         this.type = type;
         this.properties = ntProperties;
         this.bound = false;
