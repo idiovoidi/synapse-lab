@@ -19,11 +19,11 @@ export class Neurotransmitter {
         this.bound = false;
         this.reuptaking = false;
 
-        // Create more directed movement toward receptors
-        const spread = 0.3;
+        // Create more directed movement toward receptors (positive X direction toward postsynaptic side)
+        const spread = 0.2;
 
         this.velocity = new THREE.Vector3(
-            ntProperties.speed + Math.random() * 0.05,
+            ntProperties.speed + Math.random() * 0.03, // Move toward receptors (positive X)
             (Math.random() - 0.5) * spread,
             (Math.random() - 0.5) * spread
         );
@@ -32,14 +32,35 @@ export class Neurotransmitter {
     update() {
         if (!this.bound && !this.reuptaking) {
             // Add slight wavering motion while maintaining forward direction
-            this.velocity.y += (Math.random() - 0.5) * 0.01;
-            this.velocity.z += (Math.random() - 0.5) * 0.01;
+            this.velocity.y += (Math.random() - 0.5) * 0.008;
+            this.velocity.z += (Math.random() - 0.5) * 0.008;
             
             // Clamp vertical and depth movement to maintain focused path
-            this.velocity.y = THREE.MathUtils.clamp(this.velocity.y, -0.05, 0.05);
-            this.velocity.z = THREE.MathUtils.clamp(this.velocity.z, -0.05, 0.05);
+            this.velocity.y = THREE.MathUtils.clamp(this.velocity.y, -0.04, 0.04);
+            this.velocity.z = THREE.MathUtils.clamp(this.velocity.z, -0.04, 0.04);
+            
+            // Add slight attraction toward receptor plane (x=4)
+            const targetX = 4;
+            const distanceToTarget = targetX - this.mesh.position.x;
+            if (distanceToTarget > 0) {
+                this.velocity.x += distanceToTarget * 0.001; // Gentle acceleration toward receptors
+            }
             
             this.mesh.position.add(this.velocity);
+            
+            // Enforce boundaries (keep in synaptic cleft)
+            this.mesh.position.y = THREE.MathUtils.clamp(this.mesh.position.y, -4, 4);
+            this.mesh.position.z = THREE.MathUtils.clamp(this.mesh.position.z, -3, 3);
+            
+            // Bounce back if going too far past receptors
+            if (this.mesh.position.x > 6) {
+                this.velocity.x *= -0.5;
+                this.mesh.position.x = 6;
+            }
+            
+            // Add pulsing glow effect
+            const pulse = Math.sin(Date.now() * 0.005) * 0.1 + 0.2;
+            this.mesh.material.emissiveIntensity = pulse;
         }
     }
 } 

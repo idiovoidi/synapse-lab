@@ -15,7 +15,8 @@ export class SceneManager {
             0.1,
             1000
         );
-        this.camera.position.set(0, 20, 30);
+        // Better angle to see the synaptic cleft and neurotransmitter flow
+        this.camera.position.set(0, 8, 25);
         this.camera.lookAt(0, 0, 0);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });

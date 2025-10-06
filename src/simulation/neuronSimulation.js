@@ -220,25 +220,32 @@ export class NeuronSimulation {
     }
 
     createReceptors() {
-        const receptorCount = 8;
-        const spacing = 1;
+        const receptorCount = 10;
+        const spacing = 0.8;
         const startX = 4;
-        const startY = -2;
+        const startY = -3.5;
 
         for (let i = 0; i < receptorCount; i++) {
-            const receptorGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+            const receptorGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
             const receptorMaterial = new THREE.MeshPhongMaterial({
-                color: 0x444444,
-                shininess: 100
+                color: 0x666666,
+                shininess: 100,
+                emissive: 0x222222,
+                emissiveIntensity: 0.3
             });
             const receptor = new THREE.Mesh(receptorGeometry, receptorMaterial);
             
             receptor.position.set(
                 startX,
                 startY + (i * spacing),
-                0
+                (Math.random() - 0.5) * 0.5 // Slight depth variation
             );
             receptor.occupied = false;
+            receptor.rotation.set(
+                Math.random() * 0.2,
+                Math.random() * 0.2,
+                Math.random() * 0.2
+            );
             
             this.receptors.push(receptor);
             this.scene.add(receptor);
@@ -250,46 +257,44 @@ export class NeuronSimulation {
             type = 'DOPAMINE';
         }
 
-        if (this.vesicles.length > 0) {
-            const vesicle = new StorageVesicle(this.vesicles[0].mesh.position.clone());
-            const releasePosition = new THREE.Vector3(-3.5, 0, 0);
+        // Simply release from the axon terminal position
+        const releasePosition = new THREE.Vector3(-3.5, 0, 0);
+        this.createNeurotransmitterBurst(releasePosition, type);
+        
+        // Visual feedback: pulse the axon terminal
+        if (this.axonTerminal) {
+            const originalScale = this.axonTerminal.scale.clone();
+            const pulseStart = Date.now();
+            const pulseDuration = 300;
             
-            // Move vesicle to release position
-            vesicle.moveToReleasePosition(releasePosition, () => {
-                // Release neurotransmitters
-                this.createNeurotransmitterBurst(vesicle.mesh.position, type);
+            const pulseAnimation = () => {
+                const elapsed = Date.now() - pulseStart;
+                const progress = elapsed / pulseDuration;
                 
-                // Animate vesicle disappearing
-                const fadeOut = (opacity) => {
-                    if (opacity <= 0) {
-                        this.scene.remove(vesicle.mesh);
-                        this.vesicles.shift();
-                    } else {
-                        vesicle.mesh.material.opacity = opacity;
-                        vesicle.storedNeurotransmitters.forEach(nt => {
-                            nt.material.opacity = opacity;
-                        });
-                        requestAnimationFrame(() => fadeOut(opacity - 0.05));
-                    }
-                };
-                
-                fadeOut(0.8);
-            });
+                if (progress < 1) {
+                    const scale = 1 + Math.sin(progress * Math.PI) * 0.15;
+                    this.axonTerminal.scale.setScalar(scale);
+                    requestAnimationFrame(pulseAnimation);
+                } else {
+                    this.axonTerminal.scale.copy(originalScale);
+                }
+            };
+            pulseAnimation();
         }
     }
 
     createNeurotransmitterBurst(position, type) {
-        const count = 6; // Match the number of stored neurotransmitters
-        const spread = 0.2; // Reduced spread for more focused release
+        const count = 8; // More neurotransmitters per release
+        const spread = 0.3;
         
         for (let i = 0; i < count; i++) {
             setTimeout(() => {
                 const pos = position.clone();
                 const angle = (i / count) * Math.PI * 2;
                 
-                // Release in a circular pattern
+                // Release in a circular pattern with slight forward bias
                 pos.add(new THREE.Vector3(
-                    0,
+                    Math.random() * 0.3, // Small forward offset
                     Math.sin(angle) * spread,
                     Math.cos(angle) * spread
                 ));
@@ -297,8 +302,20 @@ export class NeuronSimulation {
                 const nt = new Neurotransmitter(pos, type);
                 this.neurotransmitters.push(nt);
                 this.scene.add(nt.mesh);
+                
+                // Add initial "pop" animation
+                nt.mesh.scale.setScalar(0.1);
+                const startTime = Date.now();
+                const popAnimation = () => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / 200, 1);
+                    nt.mesh.scale.setScalar(0.1 + progress * 0.9);
+                    if (progress < 1) requestAnimationFrame(popAnimation);
+                };
+                popAnimation();
+                
                 if (this.eventBus) this.eventBus.emit('nt:released', { type, nt });
-            }, i * 50);
+            }, i * 40);
         }
     }
 
@@ -312,8 +329,14 @@ export class NeuronSimulation {
         // Reset receptors
         this.receptors.forEach(receptor => {
             receptor.occupied = false;
-            receptor.material.color.setHex(0x444444);
+            receptor.boundNT = null;
+            receptor.material.color.setHex(0x666666);
+            receptor.material.emissive.setHex(0x222222);
+            receptor.material.emissiveIntensity = 0.3;
         });
+        
+        // Emit reset event
+        if (this.eventBus) this.eventBus.emit('sim:reset');
     }
 
     checkBinding() {
@@ -322,17 +345,58 @@ export class NeuronSimulation {
                 this.receptors.forEach(receptor => {
                     if (!receptor.occupied) {
                         const distance = nt.mesh.position.distanceTo(receptor.position);
-                        if (distance < 0.5) {
+                        if (distance < 0.6) {
                             nt.bound = true;
+                            nt.bindTime = Date.now();
                             nt.mesh.position.copy(receptor.position);
+                            nt.mesh.position.x -= 0.2; // Slightly in front of receptor
                             receptor.occupied = true;
+                            receptor.boundNT = nt;
+                            
+                            // Color receptor based on polarity
                             const polarity = NEUROTRANSMITTER_TYPES[nt.type]?.polarity;
-                            const color = polarity === 'EXCITATORY' ? 0xff4444 : 0x44ff44;
+                            const color = polarity === 'EXCITATORY' ? 0xff6666 : 0x66ff66;
                             receptor.material.color.setHex(color);
+                            receptor.material.emissive.setHex(color);
+                            receptor.material.emissiveIntensity = 0.5;
+                            
+                            // Make bound NT glow brighter
+                            nt.mesh.material.emissiveIntensity = 0.6;
+                            nt.mesh.scale.setScalar(1.2);
+                            
                             if (this.eventBus) this.eventBus.emit('nt:bound', { nt, receptor });
                         }
                     }
                 });
+            } else {
+                // Check for unbinding after some time
+                const bindDuration = Date.now() - (nt.bindTime || 0);
+                const unbindProbability = 0.0005; // Very low per-frame probability
+                
+                if (bindDuration > 2000 && Math.random() < unbindProbability) {
+                    // Unbind
+                    const receptor = this.receptors.find(r => r.boundNT === nt);
+                    if (receptor) {
+                        receptor.occupied = false;
+                        receptor.boundNT = null;
+                        receptor.material.color.setHex(0x666666);
+                        receptor.material.emissive.setHex(0x222222);
+                        receptor.material.emissiveIntensity = 0.3;
+                    }
+                    
+                    nt.bound = false;
+                    nt.mesh.scale.setScalar(1.0);
+                    nt.mesh.material.emissiveIntensity = 0.2;
+                    
+                    // Give it a small random velocity to drift away
+                    nt.velocity = new THREE.Vector3(
+                        -0.02 + Math.random() * 0.01,
+                        (Math.random() - 0.5) * 0.03,
+                        (Math.random() - 0.5) * 0.03
+                    );
+                    
+                    if (this.eventBus) this.eventBus.emit('nt:unbound', { nt, receptor });
+                }
             }
         });
     }
@@ -360,14 +424,16 @@ export class NeuronSimulation {
         this.dendrite.position.x = 5;
         this.scene.add(this.dendrite);
 
-        // Create more detailed synaptic cleft
+        // Create more detailed synaptic cleft with activity indicator
         const cleftGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.8, 32, 5, true);
         const cleftMaterial = new THREE.MeshPhongMaterial({
             color: 0xaaaaff,
             transparent: true,
             opacity: 0.1,
             side: THREE.DoubleSide,
-            wireframe: true
+            wireframe: true,
+            emissive: 0x4444ff,
+            emissiveIntensity: 0
         });
         this.synapticCleft = new THREE.Mesh(cleftGeometry, cleftMaterial);
         this.synapticCleft.rotation.z = Math.PI / 2;
@@ -545,8 +611,8 @@ export class NeuronSimulation {
 
         this.neurotransmitters.forEach(nt => {
             if (!nt.bound && !nt.reuptaking) {
-                // Use type-specific reuptake rate
-                if (Math.random() < nt.properties.reuptakeRate) {
+                // Use type-specific reuptake rate (reduced probability for slower reuptake)
+                if (Math.random() < nt.properties.reuptakeRate * 0.003) {
                     this.transporters.forEach(transporter => {
                         const distance = nt.mesh.position.distanceTo(transporter.position);
                         if (distance < 0.5) {
@@ -599,6 +665,13 @@ export class NeuronSimulation {
         // Compute mood summary for EmotionalFace and UI consumers
         this.moodSummary = computeMoodSummary(this.neurotransmitters);
 
+        // Update synaptic cleft glow based on activity
+        const activityLevel = Math.min(this.neurotransmitters.length / 20, 1);
+        if (this.synapticCleft) {
+            this.synapticCleft.material.emissiveIntensity = activityLevel * 0.3;
+            this.synapticCleft.material.opacity = 0.1 + activityLevel * 0.15;
+        }
+
         if (this.eventBus) {
             this.eventBus.emit('sim:effectsUpdated', this.latestEffects);
             this.eventBus.emit('sim:moodUpdated', this.moodSummary);
@@ -642,10 +715,11 @@ export class NeuronSimulation {
 
         this.axonalFlow = flowParticles;
         this.axonTerminal.add(flowParticles);
-
-        // Animate flow particles
-        const animateFlow = () => {
-            flowParticles.children.forEach(particle => {
+    }
+    
+    updateAxonalFlow() {
+        if (this.axonalFlow) {
+            this.axonalFlow.children.forEach(particle => {
                 particle.userData.phase += particle.userData.speed;
                 
                 // Create flowing motion along axon terminal
@@ -655,11 +729,7 @@ export class NeuronSimulation {
                     Math.sin(particle.userData.phase * 0.5) * 0.5
                 );
             });
-            
-            requestAnimationFrame(animateFlow);
-        };
-        
-        animateFlow();
+        }
     }
 
     createMAOEnzymes() {
@@ -701,7 +771,7 @@ export class NeuronSimulation {
                 this.maoEnzymes.forEach(enzyme => {
                     const distance = nt.mesh.position.distanceTo(enzyme.position);
                     
-                    if (distance < 0.5 && Math.random() < nt.properties.degradationRate) {
+                    if (distance < 0.5 && Math.random() < nt.properties.degradationRate * 0.002) {
                         // Animate degradation
                         const startPos = nt.mesh.position.clone();
                         const startColor = new THREE.Color(nt.properties.color);
@@ -790,6 +860,9 @@ export class NeuronSimulation {
             enzyme.position.copy(enzyme.userData.originalPos)
                 .add(new THREE.Vector3(wobble, wobble, wobble));
         });
+        
+        // Update axonal flow (moved from separate animation loop)
+        this.updateAxonalFlow();
 
         // Camera rotation and rendering are handled by SceneManager
         // We might still need camera updates related to simulation state if any
