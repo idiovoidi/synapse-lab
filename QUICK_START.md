@@ -124,8 +124,9 @@ Navigate to: **http://localhost:5500**
 
 ### Nothing appears?
 - Check browser console (F12) for errors
-- Make sure you're using a modern browser
+- Make sure you're using a modern browser (Chrome 120+, Firefox 121+, Safari 17+, Edge 120+)
 - Try refreshing the page
+- Clear browser cache if updating from older version
 
 ### Slow performance?
 - Close other browser tabs

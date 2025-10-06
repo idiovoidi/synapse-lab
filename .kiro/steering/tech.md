@@ -28,5 +28,13 @@ npm run dev
 
 ## External Dependencies
 
-- Three.js loaded from unpkg.com CDN (no npm install needed for runtime)
+- Three.js v0.170.0 loaded from jsDelivr CDN (no npm install needed for runtime)
 - No other external libraries or frameworks
+
+## CDN Updates
+
+The project uses jsDelivr CDN for Three.js instead of unpkg for better reliability and performance:
+- Main library: `https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js`
+- Addons: `https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/`
+
+Note: Three.js changed the import path from `three/examples/jsm/` to `three/addons/` in recent versions.
