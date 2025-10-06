@@ -13,12 +13,13 @@ export class NeuronSimulation {
    * @param {import('../render/sceneManager.js').SceneManager} sceneManager
    * @param {{on?:Function, off?:Function, emit?:Function}|null} eventBus
    */
-  constructor(sceneManager, eventBus = null) {
+  constructor(sceneManager, eventBus = null, cleftStructure = null) {
     this.sceneManager = sceneManager;
     this.scene = sceneManager.scene;
     this.camera = sceneManager.camera;
     this.renderer = sceneManager.renderer;
     this.eventBus = eventBus;
+    this.cleftStructure = cleftStructure;
     this._lastEffectsEmitMs = 0;
     this.degradationParticlePool = [];
     this.degradationParticleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
@@ -869,7 +870,9 @@ export class NeuronSimulation {
 
     // Update synaptic cleft glow based on activity
     const activityLevel = Math.min(this.neurotransmitters.length / 20, 1);
-    if (this.synapticCleft) {
+    if (this.cleftStructure) {
+      this.cleftStructure.updateCleftGlow(activityLevel);
+    } else if (this.synapticCleft) {
       this.synapticCleft.material.emissiveIntensity = activityLevel * 0.3;
       this.synapticCleft.material.opacity = 0.1 + activityLevel * 0.15;
     }

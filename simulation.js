@@ -5,6 +5,7 @@ import { setupControls } from './src/ui/controls.js';
 import { createEventBus } from './src/utils/eventBus.js';
 import { EmotionalFace } from './emotionalFace.js';
 import { VesicleView } from './src/render/vesicleView.js';
+import { SynapticCleftStructure } from './src/render/synapticCleftStructure.js';
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,7 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Starting initialization...');
         const sceneManager = new SceneManager();
         const eventBus = createEventBus();
-        const simulation = new NeuronSimulation(sceneManager, eventBus);
+        
+        // Create realistic synaptic cleft structure
+        const cleftStructure = new SynapticCleftStructure(sceneManager.scene);
+        
+        const simulation = new NeuronSimulation(sceneManager, eventBus, cleftStructure);
         
         // Create vesicle view for inside perspective
         const vesicleView = new VesicleView(sceneManager.scene);
