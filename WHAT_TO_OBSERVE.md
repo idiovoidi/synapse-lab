@@ -47,11 +47,48 @@
    - **Degradation**: Red MAO enzymes break down particles (slow)
    - Watch particles fade and shrink as they're cleared
 
-### 🎭 Emotional Face (top-right)
-- **Mouth curve** - happiness level
-- **Pupil size** - arousal level
-- **Eye position/squint** - anxiety level
-- **Blinking** - faster when anxious
+### 🎭 Emotional Face (top-right) - ENHANCED!
+
+**Display:**
+- Larger, prominent square display with rounded corners
+- Shadow and border effects
+- "Mood State" label at bottom
+- Dynamic background color that changes with mood
+
+**Features:**
+- **Eyes** - Multi-layered realistic eyes
+  - Iris color changes (bright blue → dark blue → vibrant)
+  - Pupils dilate dramatically with arousal (up to 80%)
+  - Eyes widen when aroused (15% larger)
+  - Squint when anxious (60% narrower)
+  - Subtle jitter when very anxious
+  - White highlights make eyes look alive
+- **Eyebrows** - Thick, expressive brows
+  - Raise high with happiness/arousal (35%)
+  - Furrow inward with anxiety (15° angle)
+  - Thicken with strong emotions (30%)
+- **Mouth** - Dynamic curve and position
+  - Smiles upward when happy (80% curve)
+  - Frowns/tightens when anxious
+  - Widens with arousal (30% wider)
+  - Moves down when tense
+- **Cheeks** - Blushing effect (NEW!)
+  - Pink and puffy when happy
+  - Visible with arousal
+  - Fade when neutral/anxious
+- **Nose** - Small centered nose (NEW!)
+- **Head** - Tilts and bobs (NEW!)
+  - Tilts 8° when happy
+  - Tilts opposite 5° when anxious
+  - Subtle bobbing with arousal
+- **Particles** - Special effects (NEW!)
+  - ✨ Yellow sparkles float up when very happy (>0.6)
+  - 💧 Blue sweat drops fall when very anxious (>0.6)
+- **Background** - Mood-responsive colors (NEW!)
+  - Warm blue (0x2a3a4a) when happy
+  - Energetic purple (0x2a2040) when aroused
+  - Dark blue (0x1a1a2e) when anxious/neutral
+- **Blinking** - Natural blinking, faster when anxious
 
 ### 📊 Info Panel (right side)
 Shows active neurotransmitter types and their effects
