@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { NEUROTRANSMITTER_TYPES } from '../constants/neurotransmitterTypes.js';
+import * as CONST from '../constants/simulationConstants.js';
 
 export class Neurotransmitter {
     constructor(position, type) {
@@ -54,13 +55,21 @@ export class Neurotransmitter {
             this.mesh.position.add(this.velocity);
             
             // Enforce boundaries (keep in synaptic cleft)
-            this.mesh.position.y = THREE.MathUtils.clamp(this.mesh.position.y, -4, 4);
-            this.mesh.position.z = THREE.MathUtils.clamp(this.mesh.position.z, -3, 3);
+            this.mesh.position.y = THREE.MathUtils.clamp(
+                this.mesh.position.y,
+                CONST.BOUNDARY_LIMITS.y.min,
+                CONST.BOUNDARY_LIMITS.y.max
+            );
+            this.mesh.position.z = THREE.MathUtils.clamp(
+                this.mesh.position.z,
+                CONST.BOUNDARY_LIMITS.z.min,
+                CONST.BOUNDARY_LIMITS.z.max
+            );
             
             // Bounce back if going too far past receptors
-            if (this.mesh.position.x > 6) {
+            if (this.mesh.position.x > CONST.BOUNDARY_LIMITS.xMax) {
                 this.velocity.x *= -0.5;
-                this.mesh.position.x = 6;
+                this.mesh.position.x = CONST.BOUNDARY_LIMITS.xMax;
             }
             
             // Add pulsing glow effect

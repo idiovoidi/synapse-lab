@@ -3,6 +3,8 @@ import { NEUROTRANSMITTER_TYPES } from "../constants/neurotransmitterTypes.js";
 import { StorageVesicle } from "../models/storageVesicle.js";
 import { Neurotransmitter } from "../models/neurotransmitter.js";
 import { computeMoodSummary } from "./mood.js";
+import { SpatialGrid } from "../utils/spatialGrid.js";
+import * as CONST from "../constants/simulationConstants.js";
 
 /**
  * Orchestrates neurotransmitter simulation and emits UI/rendering events.
@@ -22,11 +24,15 @@ export class NeuronSimulation {
     this.cleftStructure = cleftStructure;
     this._lastEffectsEmitMs = 0;
     this.degradationParticlePool = [];
-    this.degradationParticleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+    this.degradationParticleGeometry = new THREE.SphereGeometry(
+      CONST.DEGRADATION_PARTICLE_SIZE,
+      CONST.DEGRADATION_PARTICLE_SEGMENTS,
+      CONST.DEGRADATION_PARTICLE_SEGMENTS
+    );
     this.degradationParticleMaterial = new THREE.MeshPhongMaterial({
-      color: 0xff4444,
+      color: CONST.MATERIAL_DEFAULTS.degradationParticle.color,
       transparent: true,
-      opacity: 0.5,
+      opacity: CONST.MATERIAL_DEFAULTS.degradationParticle.opacity,
     });
 
     // Initialize properties
@@ -51,71 +57,101 @@ export class NeuronSimulation {
 
     this.maoEnzymes = [];
     this.createMAOEnzymes();
+
+    // Initialize spatial grid for efficient collision detection
+    // Grid covers the synaptic cleft area where binding occurs
+    this.spatialGrid = new SpatialGrid(
+      CONST.SPATIAL_GRID_BOUNDS,
+      CONST.SPATIAL_GRID_CELL_SIZE
+    );
   }
 
   createNeurons() {
     // Create cell body (soma) for presynaptic neuron with better material
-    const somaGeometry = new THREE.SphereGeometry(3, 32, 32);
+    const somaGeometry = new THREE.SphereGeometry(
+      CONST.SOMA_RADIUS,
+      CONST.SOMA_SEGMENTS,
+      CONST.SOMA_SEGMENTS
+    );
     const somaMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffbb77,
+      color: CONST.MATERIAL_DEFAULTS.neuron.color,
       transparent: true,
-      opacity: 0.85,
-      roughness: 0.4,
-      metalness: 0.1,
-      emissive: 0x442200,
-      emissiveIntensity: 0.1,
+      opacity: CONST.MATERIAL_DEFAULTS.neuron.opacity,
+      roughness: CONST.MATERIAL_DEFAULTS.neuron.roughness,
+      metalness: CONST.MATERIAL_DEFAULTS.neuron.metalness,
+      emissive: CONST.MATERIAL_DEFAULTS.neuron.emissive,
+      emissiveIntensity: CONST.MATERIAL_DEFAULTS.neuron.emissiveIntensity,
     });
     this.preSoma = new THREE.Mesh(somaGeometry, somaMaterial);
-    this.preSoma.position.set(-15, 0, 0);
+    this.preSoma.position.set(
+      CONST.PRESYNAPTIC_SOMA_POSITION.x,
+      CONST.PRESYNAPTIC_SOMA_POSITION.y,
+      CONST.PRESYNAPTIC_SOMA_POSITION.z
+    );
     this.preSoma.castShadow = true;
     this.preSoma.receiveShadow = true;
     this.scene.add(this.preSoma);
 
     // Create nucleus with better material
-    const nucleusGeometry = new THREE.SphereGeometry(1, 24, 24);
+    const nucleusGeometry = new THREE.SphereGeometry(
+      CONST.NUCLEUS_RADIUS,
+      CONST.NUCLEUS_SEGMENTS,
+      CONST.NUCLEUS_SEGMENTS
+    );
     const nucleusMaterial = new THREE.MeshStandardMaterial({
-      color: 0x5555cc,
+      color: CONST.MATERIAL_DEFAULTS.nucleus.color,
       transparent: true,
-      opacity: 0.9,
-      roughness: 0.3,
-      metalness: 0.2,
-      emissive: 0x222266,
-      emissiveIntensity: 0.3,
+      opacity: CONST.MATERIAL_DEFAULTS.nucleus.opacity,
+      roughness: CONST.MATERIAL_DEFAULTS.nucleus.roughness,
+      metalness: CONST.MATERIAL_DEFAULTS.nucleus.metalness,
+      emissive: CONST.MATERIAL_DEFAULTS.nucleus.emissive,
+      emissiveIntensity: CONST.MATERIAL_DEFAULTS.nucleus.emissiveIntensity,
     });
     const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
     this.preSoma.add(nucleus);
 
     // Create axon using a curved path
-    this.createAxon(-15, 0, 0, -5, 0, 0);
+    this.createAxon(
+      CONST.AXON_START_POSITION.x,
+      CONST.AXON_START_POSITION.y,
+      CONST.AXON_START_POSITION.z,
+      CONST.AXON_END_POSITION.x,
+      CONST.AXON_END_POSITION.y,
+      CONST.AXON_END_POSITION.z
+    );
 
     // Create dendrites for presynaptic neuron
-    this.createDendrites(this.preSoma, 6);
+    this.createDendrites(this.preSoma, CONST.DENDRITE_COUNT);
 
     // Create postsynaptic neuron
     const postSomaMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffbb77,
+      color: CONST.MATERIAL_DEFAULTS.neuron.color,
       transparent: true,
-      opacity: 0.85,
-      roughness: 0.4,
-      metalness: 0.1,
-      emissive: 0x442200,
-      emissiveIntensity: 0.1,
+      opacity: CONST.MATERIAL_DEFAULTS.neuron.opacity,
+      roughness: CONST.MATERIAL_DEFAULTS.neuron.roughness,
+      metalness: CONST.MATERIAL_DEFAULTS.neuron.metalness,
+      emissive: CONST.MATERIAL_DEFAULTS.neuron.emissive,
+      emissiveIntensity: CONST.MATERIAL_DEFAULTS.neuron.emissiveIntensity,
     });
     this.postSoma = new THREE.Mesh(somaGeometry.clone(), postSomaMaterial);
-    this.postSoma.position.set(15, 0, 0);
+    this.postSoma.position.set(
+      CONST.POSTSYNAPTIC_SOMA_POSITION.x,
+      CONST.POSTSYNAPTIC_SOMA_POSITION.y,
+      CONST.POSTSYNAPTIC_SOMA_POSITION.z
+    );
     this.postSoma.castShadow = true;
     this.postSoma.receiveShadow = true;
     this.scene.add(this.postSoma);
 
     // Add nucleus to postsynaptic neuron
     const postNucleusMaterial = new THREE.MeshStandardMaterial({
-      color: 0x5555cc,
+      color: CONST.MATERIAL_DEFAULTS.nucleus.color,
       transparent: true,
-      opacity: 0.9,
-      roughness: 0.3,
-      metalness: 0.2,
-      emissive: 0x222266,
-      emissiveIntensity: 0.3,
+      opacity: CONST.MATERIAL_DEFAULTS.nucleus.opacity,
+      roughness: CONST.MATERIAL_DEFAULTS.nucleus.roughness,
+      metalness: CONST.MATERIAL_DEFAULTS.nucleus.metalness,
+      emissive: CONST.MATERIAL_DEFAULTS.nucleus.emissive,
+      emissiveIntensity: CONST.MATERIAL_DEFAULTS.nucleus.emissiveIntensity,
     });
     const postNucleus = new THREE.Mesh(
       nucleusGeometry.clone(),
@@ -124,7 +160,7 @@ export class NeuronSimulation {
     this.postSoma.add(postNucleus);
 
     // Create dendrites for postsynaptic neuron
-    this.createDendrites(this.postSoma, 6);
+    this.createDendrites(this.postSoma, CONST.DENDRITE_COUNT);
   }
 
   createAxon(startX, startY, startZ, endX, endY, endZ) {
@@ -334,21 +370,24 @@ export class NeuronSimulation {
     }
 
     // Simply release from the axon terminal position
-    const releasePosition = new THREE.Vector3(-3.5, 0, 0);
+    const releasePosition = new THREE.Vector3(
+      CONST.NT_RELEASE_POSITION.x,
+      CONST.NT_RELEASE_POSITION.y,
+      CONST.NT_RELEASE_POSITION.z
+    );
     this.createNeurotransmitterBurst(releasePosition, type);
 
     // Visual feedback: pulse the axon terminal
     if (this.axonTerminal) {
       const originalScale = this.axonTerminal.scale.clone();
       const pulseStart = Date.now();
-      const pulseDuration = 300;
 
       const pulseAnimation = () => {
         const elapsed = Date.now() - pulseStart;
-        const progress = elapsed / pulseDuration;
+        const progress = elapsed / CONST.VESICLE_PULSE_DURATION_MS;
 
         if (progress < 1) {
-          const scale = 1 + Math.sin(progress * Math.PI) * 0.15;
+          const scale = 1 + Math.sin(progress * Math.PI) * CONST.VESICLE_PULSE_SCALE;
           this.axonTerminal.scale.setScalar(scale);
           requestAnimationFrame(pulseAnimation);
         } else {
@@ -360,8 +399,8 @@ export class NeuronSimulation {
   }
 
   createNeurotransmitterBurst(position, type) {
-    const count = 8; // More neurotransmitters per release
-    const spread = 0.3;
+    const count = CONST.NT_BURST_COUNT;
+    const spread = CONST.NT_BURST_SPREAD;
 
     for (let i = 0; i < count; i++) {
       setTimeout(() => {
@@ -371,7 +410,7 @@ export class NeuronSimulation {
         // Release in a circular pattern with slight forward bias
         pos.add(
           new THREE.Vector3(
-            Math.random() * 0.3, // Small forward offset
+            Math.random() * spread, // Small forward offset
             Math.sin(angle) * spread,
             Math.cos(angle) * spread
           )
@@ -382,18 +421,18 @@ export class NeuronSimulation {
         this.scene.add(nt.mesh);
 
         // Add initial "pop" animation
-        nt.mesh.scale.setScalar(0.1);
+        nt.mesh.scale.setScalar(CONST.NT_POP_START_SCALE);
         const startTime = Date.now();
         const popAnimation = () => {
           const elapsed = Date.now() - startTime;
-          const progress = Math.min(elapsed / 200, 1);
-          nt.mesh.scale.setScalar(0.1 + progress * 0.9);
+          const progress = Math.min(elapsed / CONST.NT_POP_ANIMATION_DURATION_MS, 1);
+          nt.mesh.scale.setScalar(CONST.NT_POP_START_SCALE + progress * (1 - CONST.NT_POP_START_SCALE));
           if (progress < 1) requestAnimationFrame(popAnimation);
         };
         popAnimation();
 
         if (this.eventBus) this.eventBus.emit("nt:released", { type, nt });
-      }, i * 40);
+      }, i * CONST.NT_BURST_DELAY_MS);
     }
   }
 
@@ -408,12 +447,12 @@ export class NeuronSimulation {
     this.receptors.forEach((receptor) => {
       receptor.occupied = false;
       receptor.boundNT = null;
-      receptor.baseMaterial.color.setHex(0x666666);
-      receptor.baseMaterial.emissive.setHex(0x222222);
-      receptor.baseMaterial.emissiveIntensity = 0.3;
-      receptor.bindingSiteMaterial.color.setHex(0x888888);
-      receptor.bindingSiteMaterial.emissive.setHex(0x333333);
-      receptor.bindingSiteMaterial.emissiveIntensity = 0.4;
+      receptor.baseMaterial.color.setHex(CONST.RECEPTOR_COLORS.INACTIVE.base);
+      receptor.baseMaterial.emissive.setHex(CONST.RECEPTOR_COLORS.INACTIVE.emissive);
+      receptor.baseMaterial.emissiveIntensity = CONST.RECEPTOR_COLORS.INACTIVE.baseEmissiveIntensity;
+      receptor.bindingSiteMaterial.color.setHex(CONST.RECEPTOR_COLORS.INACTIVE.bindingSite);
+      receptor.bindingSiteMaterial.emissive.setHex(CONST.RECEPTOR_COLORS.INACTIVE.bindingSiteEmissive);
+      receptor.bindingSiteMaterial.emissiveIntensity = CONST.RECEPTOR_COLORS.INACTIVE.bindingSiteEmissiveIntensity;
     });
 
     // Emit reset event
@@ -421,66 +460,86 @@ export class NeuronSimulation {
   }
 
   checkBinding() {
+    // Rebuild spatial grid each frame with receptor positions
+    // This is fast since we only have ~10 receptors
+    this.spatialGrid.clear();
+    this.receptors.forEach(receptor => {
+      if (!receptor.occupied) {
+        this.spatialGrid.insert(receptor, receptor.position);
+      }
+    });
+
+    // Check each neurotransmitter against only nearby receptors
     this.neurotransmitters.forEach((nt) => {
       if (!nt.bound) {
-        this.receptors.forEach((receptor) => {
+        // Get only receptors near this neurotransmitter (spatial optimization)
+        const nearbyReceptors = this.spatialGrid.getNearby(
+          nt.mesh.position,
+          CONST.BINDING_DISTANCE
+        );
+        
+        // Check distance only for nearby receptors
+        for (const receptor of nearbyReceptors) {
           if (!receptor.occupied) {
             const distance = nt.mesh.position.distanceTo(receptor.position);
-            if (distance < 0.6) {
+            if (distance < CONST.BINDING_DISTANCE) {
               nt.bound = true;
               nt.bindTime = Date.now();
               nt.mesh.position.copy(receptor.position);
-              nt.mesh.position.x -= 0.2; // Slightly in front of receptor
+              nt.mesh.position.x -= CONST.BINDING_OFFSET;
               receptor.occupied = true;
               receptor.boundNT = nt;
 
               // Color receptor based on polarity
               const polarity = NEUROTRANSMITTER_TYPES[nt.type]?.polarity;
-              const color = polarity === "EXCITATORY" ? 0xff6666 : 0x66ff66;
+              const color = polarity === "EXCITATORY" 
+                ? CONST.RECEPTOR_COLORS.EXCITATORY.color 
+                : CONST.RECEPTOR_COLORS.INHIBITORY.color;
               receptor.baseMaterial.color.setHex(color);
               receptor.baseMaterial.emissive.setHex(color);
-              receptor.baseMaterial.emissiveIntensity = 0.7;
+              receptor.baseMaterial.emissiveIntensity = CONST.RECEPTOR_COLORS.EXCITATORY.emissiveIntensity;
               receptor.bindingSiteMaterial.color.setHex(color);
               receptor.bindingSiteMaterial.emissive.setHex(color);
-              receptor.bindingSiteMaterial.emissiveIntensity = 0.8;
+              receptor.bindingSiteMaterial.emissiveIntensity = CONST.RECEPTOR_COLORS.EXCITATORY.bindingSiteEmissiveIntensity;
 
               // Make bound NT glow brighter
-              nt.mesh.material.emissiveIntensity = 0.6;
-              nt.mesh.scale.setScalar(1.2);
+              nt.mesh.material.emissiveIntensity = CONST.BOUND_NT_EMISSIVE_INTENSITY;
+              nt.mesh.scale.setScalar(CONST.BOUND_NT_SCALE);
 
               if (this.eventBus)
                 this.eventBus.emit("nt:bound", { nt, receptor });
+              
+              break; // Stop checking once bound
             }
           }
-        });
+        }
       } else {
         // Check for unbinding after some time
         const bindDuration = Date.now() - (nt.bindTime || 0);
-        const unbindProbability = 0.0005; // Very low per-frame probability
 
-        if (bindDuration > 2000 && Math.random() < unbindProbability) {
+        if (bindDuration > CONST.BINDING_MIN_DURATION_MS && Math.random() < CONST.UNBINDING_PROBABILITY) {
           // Unbind
           const receptor = this.receptors.find((r) => r.boundNT === nt);
           if (receptor) {
             receptor.occupied = false;
             receptor.boundNT = null;
-            receptor.baseMaterial.color.setHex(0x666666);
-            receptor.baseMaterial.emissive.setHex(0x222222);
-            receptor.baseMaterial.emissiveIntensity = 0.3;
-            receptor.bindingSiteMaterial.color.setHex(0x888888);
-            receptor.bindingSiteMaterial.emissive.setHex(0x333333);
-            receptor.bindingSiteMaterial.emissiveIntensity = 0.4;
+            receptor.baseMaterial.color.setHex(CONST.RECEPTOR_COLORS.INACTIVE.base);
+            receptor.baseMaterial.emissive.setHex(CONST.RECEPTOR_COLORS.INACTIVE.emissive);
+            receptor.baseMaterial.emissiveIntensity = CONST.RECEPTOR_COLORS.INACTIVE.baseEmissiveIntensity;
+            receptor.bindingSiteMaterial.color.setHex(CONST.RECEPTOR_COLORS.INACTIVE.bindingSite);
+            receptor.bindingSiteMaterial.emissive.setHex(CONST.RECEPTOR_COLORS.INACTIVE.bindingSiteEmissive);
+            receptor.bindingSiteMaterial.emissiveIntensity = CONST.RECEPTOR_COLORS.INACTIVE.bindingSiteEmissiveIntensity;
           }
 
           nt.bound = false;
-          nt.mesh.scale.setScalar(1.0);
-          nt.mesh.material.emissiveIntensity = 0.2;
+          nt.mesh.scale.setScalar(CONST.UNBOUND_NT_SCALE);
+          nt.mesh.material.emissiveIntensity = CONST.UNBOUND_NT_EMISSIVE_INTENSITY;
 
           // Give it a small random velocity to drift away
           nt.velocity = new THREE.Vector3(
-            -0.02 + Math.random() * 0.01,
-            (Math.random() - 0.5) * 0.03,
-            (Math.random() - 0.5) * 0.03
+            CONST.UNBIND_VELOCITY.x + Math.random() * CONST.UNBIND_VELOCITY.xRandom,
+            (Math.random() - 0.5) * CONST.UNBIND_VELOCITY.yRange,
+            (Math.random() - 0.5) * CONST.UNBIND_VELOCITY.zRange
           );
 
           if (this.eventBus) this.eventBus.emit("nt:unbound", { nt, receptor });
