@@ -35,8 +35,8 @@ export const NT_RELEASE_POSITION = { x: -3.5, y: 0, z: 0 }; // Release point
 // ============================================================================
 // REUPTAKE
 // ============================================================================
-export const REUPTAKE_DISTANCE = 0.5; // Distance threshold for reuptake
-export const REUPTAKE_BASE_PROBABILITY = 0.003; // Base probability multiplier
+export const REUPTAKE_DISTANCE = 1.5; // Distance threshold for reuptake (increased for visibility)
+export const REUPTAKE_BASE_PROBABILITY = 0.02; // Base probability multiplier (increased from 0.003)
 
 // ============================================================================
 // DEGRADATION

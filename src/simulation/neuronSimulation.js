@@ -864,53 +864,97 @@ export class NeuronSimulation {
   checkReuptake() {
     if (this.reuptakeInhibited) return;
 
+    // Check each neurotransmitter for reuptake
     this.neurotransmitters.forEach((nt) => {
       if (!nt.bound && !nt.reuptaking) {
-        // Use type-specific reuptake rate (reduced probability for slower reuptake)
-        if (Math.random() < nt.properties.reuptakeRate * 0.003) {
-          this.transporters.forEach((transporter) => {
-            const distance = nt.mesh.position.distanceTo(transporter.position);
-            if (distance < 0.5) {
-              nt.reuptaking = true;
+        // Find nearest transporter
+        let nearestTransporter = null;
+        let nearestDistance = Infinity;
+        
+        this.transporters.forEach((transporter) => {
+          const distance = nt.mesh.position.distanceTo(transporter.position);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestTransporter = transporter;
+          }
+        });
+        
+        // Check if close enough to a transporter
+        const reuptakeDistance = CONST.REUPTAKE_DISTANCE || 1.5;
+        if (nearestDistance < reuptakeDistance) {
+          // Higher probability when closer to transporter
+          const proximityFactor = 1 - (nearestDistance / reuptakeDistance);
+          const reuptakeChance = nt.properties.reuptakeRate * CONST.REUPTAKE_BASE_PROBABILITY * proximityFactor;
+          
+          if (Math.random() < reuptakeChance) {
+            nt.reuptaking = true;
 
-              // Animate reuptake with visual effects
-              const startPos = nt.mesh.position.clone();
-              const targetPos = transporter.position.clone();
-              const startScale = nt.mesh.scale.clone();
+            // Animate reuptake with visual effects
+            const startPos = nt.mesh.position.clone();
+            const targetPos = nearestTransporter.position.clone();
+            const startTime = Date.now();
+            const duration = 800; // ms
 
-              const animate = (progress) => {
-                if (progress <= 1) {
-                  nt.mesh.position.lerpVectors(startPos, targetPos, progress);
+            const animate = () => {
+              const elapsed = Date.now() - startTime;
+              const progress = Math.min(elapsed / duration, 1);
+              
+              if (progress < 1) {
+                // Smooth movement toward transporter
+                nt.mesh.position.lerpVectors(startPos, targetPos, progress);
 
-                  // Scale and color transition during reuptake
-                  const scale = 1 - progress * 0.8;
-                  nt.mesh.scale.setScalar(scale);
+                // Scale down as it gets reuptaken
+                const scale = 1 - progress * 0.8;
+                nt.mesh.scale.setScalar(scale);
 
-                  const color = new THREE.Color();
-                  color.lerpColors(
-                    new THREE.Color(0x4444ff),
-                    new THREE.Color(0x222222),
-                    progress
-                  );
-                  nt.mesh.material.color = color;
+                // Color transition
+                const originalColor = new THREE.Color(nt.properties.color);
+                const targetColor = new THREE.Color(0x222222);
+                nt.mesh.material.color.lerpColors(originalColor, targetColor, progress);
+                
+                // Fade opacity
+                nt.mesh.material.opacity = 1 - progress * 0.5;
 
-                  requestAnimationFrame(() => animate(progress + 0.02));
-                } else {
-                  this.scene.remove(nt.mesh);
-                  this.neurotransmitters = this.neurotransmitters.filter(
-                    (n) => n !== nt
-                  );
-                  if (this.eventBus)
-                    this.eventBus.emit("nt:reuptaken", { nt, transporter });
+                requestAnimationFrame(animate);
+              } else {
+                // Remove from scene
+                this.scene.remove(nt.mesh);
+                
+                // Remove from array
+                const index = this.neurotransmitters.indexOf(nt);
+                if (index > -1) {
+                  this.neurotransmitters.splice(index, 1);
                 }
-              };
+                
+                // Emit event
+                if (this.eventBus) {
+                  this.eventBus.emit("nt:reuptaken", { nt, transporter: nearestTransporter });
+                }
+                
+                // Visual feedback on transporter
+                this.flashTransporter(nearestTransporter);
+              }
+            };
 
-              animate(0);
-            }
-          });
+            animate();
+          }
         }
       }
     });
+  }
+  
+  flashTransporter(transporter) {
+    // Flash the transporter to show it's working
+    const originalColor = transporter.channelMaterial.color.clone();
+    const originalIntensity = transporter.channelMaterial.emissiveIntensity;
+    
+    transporter.channelMaterial.color.setHex(0xffff00);
+    transporter.channelMaterial.emissiveIntensity = 0.8;
+    
+    setTimeout(() => {
+      transporter.channelMaterial.color.copy(originalColor);
+      transporter.channelMaterial.emissiveIntensity = originalIntensity;
+    }, 200);
   }
 
   updateEffects() {

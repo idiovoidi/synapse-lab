@@ -72,6 +72,11 @@ export class Neurotransmitter {
                 this.mesh.position.x = CONST.BOUNDARY_LIMITS.xMax;
             }
             
+            // Drift back toward presynaptic side (where transporters are) if past receptors
+            if (this.mesh.position.x > 4.5) {
+                this.velocity.x -= 0.002; // Gentle drift back
+            }
+            
             // Add pulsing glow effect
             const pulse = Math.sin(Date.now() * 0.005) * 0.1 + 0.2;
             this.mesh.material.emissiveIntensity = pulse;
