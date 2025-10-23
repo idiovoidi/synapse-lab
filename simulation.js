@@ -6,6 +6,8 @@ import { createEventBus } from './src/utils/eventBus.js';
 import { EmotionalFace } from './emotionalFace.js';
 import { VesicleView } from './src/render/vesicleView.js';
 import { SynapticCleftStructure } from './src/render/synapticCleftStructure.js';
+import { TutorialManager } from './src/tutorial/tutorialManager.js';
+import { HeartSimulation } from './src/physiology/heartSimulation.js';
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -30,12 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
             try { face.updateExpression(mood); } catch (e) { console.error(e); }
         });
         
+        // Initialize tutorial system
+        const tutorial = new TutorialManager(simulation, eventBus, sceneManager);
+        
+        // Initialize heart simulation
+        const heart = new HeartSimulation(sceneManager.scene, eventBus);
+        
         sceneManager.startAnimationLoop(() => {
             simulation.update();
             vesicleView.update();
+            heart.update(); // Update heart animation
         });
         
-        console.log('Initialization complete - Starting inside vesicle view');
+        console.log('Initialization complete - Heart simulation active');
     } catch (error) {
         console.error('Error during initialization:', error);
     }
