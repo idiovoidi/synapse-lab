@@ -1238,7 +1238,7 @@ export class NeuronSimulation {
 
 	update() {
 		// Update neurotransmitters
-		this.neurotransmitters.forEach((nt) => nt.update());
+		this.neurotransmitters.forEach((nt) => { nt.update(); });
 		this.checkBinding();
 		this.checkReuptake();
 		this.checkDegradation();

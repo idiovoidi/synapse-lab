@@ -261,16 +261,16 @@ export class VesicleView {
 		this.scene.remove(this.wireframe);
 		this.scene.remove(this.ambientParticles);
 
-		this.floatingNTs.forEach((nt) => this.scene.remove(nt));
-		this.proteins.forEach((protein) => this.scene.remove(protein));
+		this.floatingNTs.forEach((nt) => { this.scene.remove(nt); });
+		this.proteins.forEach((protein) => { this.scene.remove(protein); });
 	}
 
 	hide() {
 		this.membrane.visible = false;
 		this.wireframe.visible = false;
 		this.ambientParticles.visible = false;
-		this.floatingNTs.forEach((nt) => (nt.visible = false));
-		this.proteins.forEach((protein) => (protein.visible = false));
+		this.floatingNTs.forEach((nt) => { nt.visible = false; });
+		this.proteins.forEach((protein) => { protein.visible = false; });
 	}
 
 	show() {
@@ -278,7 +278,7 @@ export class VesicleView {
 		this.membrane.visible = true;
 		this.wireframe.visible = true;
 		this.ambientParticles.visible = true;
-		this.floatingNTs.forEach((nt) => (nt.visible = true));
-		this.proteins.forEach((protein) => (protein.visible = true));
+		this.floatingNTs.forEach((nt) => { nt.visible = true; });
+		this.proteins.forEach((protein) => { protein.visible = true; });
 	}
 }

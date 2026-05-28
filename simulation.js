@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 
 		// Initialize tutorial system
-		const tutorial = new TutorialManager(simulation, eventBus, sceneManager);
+		const _tutorial = new TutorialManager(simulation, eventBus, sceneManager);
 
 		// Initialize heart simulation
 		const heart = new HeartSimulation(sceneManager.scene, eventBus);

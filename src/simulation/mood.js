@@ -5,7 +5,7 @@ export function computeMoodSummary(neurotransmitters) {
 	if (!Array.isArray(neurotransmitters)) return mood;
 
 	for (const nt of neurotransmitters) {
-		if (!nt || !nt.type) continue;
+		if (!nt?.type) continue;
 		const weights = NEUROTRANSMITTER_TYPES[nt.type]?.moodWeights;
 		if (!weights) continue;
 		mood.happiness += weights.happiness || 0;

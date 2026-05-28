@@ -719,9 +719,9 @@ export class SynapticCleftStructure {
 		if (this.postsynapticSpine) this.postsynapticSpine.visible = false;
 		if (this.cleftEnvironment) this.cleftEnvironment.visible = false;
 		if (this.extracellularMatrix) this.extracellularMatrix.visible = false;
-		if (this.vesiclePool) this.vesiclePool.forEach((v) => (v.visible = false));
+		if (this.vesiclePool) this.vesiclePool.forEach((v) => { v.visible = false; });
 		if (this.receptorClusters)
-			this.receptorClusters.forEach((c) => (c.visible = false));
+			this.receptorClusters.forEach((c) => { c.visible = false; });
 	}
 
 	show() {
@@ -729,8 +729,8 @@ export class SynapticCleftStructure {
 		if (this.postsynapticSpine) this.postsynapticSpine.visible = true;
 		if (this.cleftEnvironment) this.cleftEnvironment.visible = true;
 		if (this.extracellularMatrix) this.extracellularMatrix.visible = true;
-		if (this.vesiclePool) this.vesiclePool.forEach((v) => (v.visible = true));
+		if (this.vesiclePool) this.vesiclePool.forEach((v) => { v.visible = true; });
 		if (this.receptorClusters)
-			this.receptorClusters.forEach((c) => (c.visible = true));
+			this.receptorClusters.forEach((c) => { c.visible = true; });
 	}
 }

@@ -299,7 +299,7 @@ export class EmotionalFace {
 			// Fallback: compute roughly from NT list
 			this.targetMood = { happiness: 0, arousal: 0, anxiety: 0 };
 			summary.forEach((nt) => {
-				if (!nt || !nt.type) return;
+				if (!nt?.type) return;
 				switch (nt.type) {
 					case "DOPAMINE":
 						this.targetMood.happiness += 0.3;
@@ -387,7 +387,7 @@ export class EmotionalFace {
 	updateParticles() {
 		// Sparkles when very happy
 		if (this.currentMood.happiness > 0.6) {
-			this.particles.forEach((particle, i) => {
+			this.particles.forEach((particle, _i) => {
 				if (particle.userData.life <= 0 && Math.random() < 0.05) {
 					// Spawn new sparkle
 					particle.position.set(
