@@ -4,190 +4,190 @@
  */
 
 export class TutorialManager {
-  constructor(simulation, eventBus, sceneManager) {
-    this.simulation = simulation;
-    this.eventBus = eventBus;
-    this.sceneManager = sceneManager;
-    this.currentStep = 0;
-    this.isActive = false;
-    this.completed = false;
-    
-    this.steps = this.createSteps();
-    this.setupUI();
-    this.setupEventListeners();
-  }
+	constructor(simulation, eventBus, sceneManager) {
+		this.simulation = simulation;
+		this.eventBus = eventBus;
+		this.sceneManager = sceneManager;
+		this.currentStep = 0;
+		this.isActive = false;
+		this.completed = false;
 
-  createSteps() {
-    return [
-      {
-        id: 'welcome',
-        title: 'Welcome to Neurotransmitter Simulation! 🧠',
-        text: 'Learn how neurons communicate through chemical signals. This tutorial will guide you through the basics of synaptic transmission.',
-        highlight: null,
-        position: 'center',
-        action: null,
-        nextButton: 'Start Tutorial'
-      },
-      {
-        id: 'presynaptic',
-        title: 'The Presynaptic Neuron',
-        text: 'This is the sending neuron. It contains the cell body (soma) and stores neurotransmitters in tiny vesicles.',
-        highlight: 'preSoma',
-        position: 'left',
-        cameraPosition: { x: -10, y: 5, z: 15 },
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'postsynaptic',
-        title: 'The Postsynaptic Neuron',
-        text: 'This is the receiving neuron. It has receptors that detect neurotransmitters.',
-        highlight: 'postSoma',
-        position: 'right',
-        cameraPosition: { x: 10, y: 5, z: 15 },
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'synaptic-cleft',
-        title: 'The Synaptic Cleft',
-        text: 'This gap between neurons is where the magic happens. Neurotransmitters travel across this space.',
-        highlight: 'synapticCleft',
-        position: 'center',
-        cameraPosition: { x: 0, y: 0, z: 20 },
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'receptors',
-        title: 'Receptors',
-        text: 'These are the "locks" on the postsynaptic neuron. Each receptor can bind to specific neurotransmitters.',
-        highlight: 'receptors',
-        position: 'right',
-        cameraPosition: { x: 5, y: 0, z: 10 },
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'select-nt',
-        title: 'Choose a Neurotransmitter',
-        text: 'Different neurotransmitters have different effects. Let\'s start with Dopamine, which is involved in reward and motivation.',
-        highlight: 'ntType',
-        position: 'bottom',
-        action: 'selectNeurotransmitter',
-        waitFor: 'nt-selected',
-        nextButton: null
-      },
-      {
-        id: 'release',
-        title: 'Release Neurotransmitters',
-        text: 'Click the Release button to send neurotransmitters across the synapse!',
-        highlight: 'releaseBtn',
-        position: 'bottom',
-        action: 'waitForRelease',
-        waitFor: 'nt:released',
-        nextButton: null
-      },
-      {
-        id: 'observe-movement',
-        title: 'Watch Them Move',
-        text: 'See how neurotransmitters drift across the synaptic cleft? They move randomly until they find a receptor.',
-        highlight: null,
-        position: 'center',
-        cameraPosition: { x: 0, y: 0, z: 15 },
-        action: 'waitForBinding',
-        waitFor: 'nt:bound',
-        duration: 3000,
-        nextButton: null
-      },
-      {
-        id: 'binding',
-        title: 'Receptor Binding! 🎯',
-        text: 'When a neurotransmitter binds to a receptor, it triggers a response in the receiving neuron. Notice how the receptor changes color!',
-        highlight: 'receptors',
-        position: 'right',
-        cameraPosition: { x: 5, y: 0, z: 10 },
-        action: null,
-        duration: 3000,
-        nextButton: 'Next'
-      },
-      {
-        id: 'mood-face',
-        title: 'Emotional Response',
-        text: 'The face shows the overall "mood" based on active neurotransmitters. Dopamine increases happiness and arousal!',
-        highlight: 'emotionalFace',
-        position: 'top-right',
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'reuptake',
-        title: 'Reuptake Process',
-        text: 'Neurotransmitters don\'t stay in the synapse forever. Transporters (orange structures) recycle them back into the presynaptic neuron.',
-        highlight: 'transporters',
-        position: 'left',
-        cameraPosition: { x: -3, y: 0, z: 10 },
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'reuptake-inhibition',
-        title: 'Reuptake Inhibition',
-        text: 'Some medications (like antidepressants) block reuptake. Let\'s try it! Click the "Toggle Reuptake Inhibition" button.',
-        highlight: 'inhibitBtn',
-        position: 'bottom',
-        action: 'waitForInhibition',
-        waitFor: 'reuptake-toggled',
-        nextButton: null
-      },
-      {
-        id: 'observe-inhibition',
-        title: 'More Neurotransmitters!',
-        text: 'With reuptake blocked, neurotransmitters stay in the synapse longer. This is how SSRIs (antidepressants) work!',
-        highlight: null,
-        position: 'center',
-        action: null,
-        duration: 3000,
-        nextButton: 'Next'
-      },
-      {
-        id: 'try-different',
-        title: 'Try Different Neurotransmitters',
-        text: 'Each neurotransmitter has unique effects:\n• Dopamine: Reward, motivation\n• Serotonin: Mood, well-being\n• GABA: Calming, inhibitory\n• Glutamate: Excitatory, learning\n• Norepinephrine: Alertness, arousal',
-        highlight: 'ntType',
-        position: 'bottom',
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'reset',
-        title: 'Reset the Simulation',
-        text: 'You can reset everything at any time with the Reset button. This clears all neurotransmitters and starts fresh.',
-        highlight: 'resetBtn',
-        position: 'bottom',
-        action: null,
-        nextButton: 'Next'
-      },
-      {
-        id: 'complete',
-        title: 'Tutorial Complete! 🎉',
-        text: 'Great job! You now understand the basics of synaptic transmission. Feel free to experiment with different neurotransmitters and settings.',
-        highlight: null,
-        position: 'center',
-        action: 'complete',
-        nextButton: 'Finish'
-      }
-    ];
-  }
+		this.steps = this.createSteps();
+		this.setupUI();
+		this.setupEventListeners();
+	}
 
-  setupUI() {
-    // Create tutorial overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'tutorial-overlay';
-    overlay.className = 'tutorial-overlay';
-    overlay.style.display = 'none';
-    
-    overlay.innerHTML = `
+	createSteps() {
+		return [
+			{
+				id: "welcome",
+				title: "Welcome to Neurotransmitter Simulation! 🧠",
+				text: "Learn how neurons communicate through chemical signals. This tutorial will guide you through the basics of synaptic transmission.",
+				highlight: null,
+				position: "center",
+				action: null,
+				nextButton: "Start Tutorial",
+			},
+			{
+				id: "presynaptic",
+				title: "The Presynaptic Neuron",
+				text: "This is the sending neuron. It contains the cell body (soma) and stores neurotransmitters in tiny vesicles.",
+				highlight: "preSoma",
+				position: "left",
+				cameraPosition: { x: -10, y: 5, z: 15 },
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "postsynaptic",
+				title: "The Postsynaptic Neuron",
+				text: "This is the receiving neuron. It has receptors that detect neurotransmitters.",
+				highlight: "postSoma",
+				position: "right",
+				cameraPosition: { x: 10, y: 5, z: 15 },
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "synaptic-cleft",
+				title: "The Synaptic Cleft",
+				text: "This gap between neurons is where the magic happens. Neurotransmitters travel across this space.",
+				highlight: "synapticCleft",
+				position: "center",
+				cameraPosition: { x: 0, y: 0, z: 20 },
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "receptors",
+				title: "Receptors",
+				text: 'These are the "locks" on the postsynaptic neuron. Each receptor can bind to specific neurotransmitters.',
+				highlight: "receptors",
+				position: "right",
+				cameraPosition: { x: 5, y: 0, z: 10 },
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "select-nt",
+				title: "Choose a Neurotransmitter",
+				text: "Different neurotransmitters have different effects. Let's start with Dopamine, which is involved in reward and motivation.",
+				highlight: "ntType",
+				position: "bottom",
+				action: "selectNeurotransmitter",
+				waitFor: "nt-selected",
+				nextButton: null,
+			},
+			{
+				id: "release",
+				title: "Release Neurotransmitters",
+				text: "Click the Release button to send neurotransmitters across the synapse!",
+				highlight: "releaseBtn",
+				position: "bottom",
+				action: "waitForRelease",
+				waitFor: "nt:released",
+				nextButton: null,
+			},
+			{
+				id: "observe-movement",
+				title: "Watch Them Move",
+				text: "See how neurotransmitters drift across the synaptic cleft? They move randomly until they find a receptor.",
+				highlight: null,
+				position: "center",
+				cameraPosition: { x: 0, y: 0, z: 15 },
+				action: "waitForBinding",
+				waitFor: "nt:bound",
+				duration: 3000,
+				nextButton: null,
+			},
+			{
+				id: "binding",
+				title: "Receptor Binding! 🎯",
+				text: "When a neurotransmitter binds to a receptor, it triggers a response in the receiving neuron. Notice how the receptor changes color!",
+				highlight: "receptors",
+				position: "right",
+				cameraPosition: { x: 5, y: 0, z: 10 },
+				action: null,
+				duration: 3000,
+				nextButton: "Next",
+			},
+			{
+				id: "mood-face",
+				title: "Emotional Response",
+				text: 'The face shows the overall "mood" based on active neurotransmitters. Dopamine increases happiness and arousal!',
+				highlight: "emotionalFace",
+				position: "top-right",
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "reuptake",
+				title: "Reuptake Process",
+				text: "Neurotransmitters don't stay in the synapse forever. Transporters (orange structures) recycle them back into the presynaptic neuron.",
+				highlight: "transporters",
+				position: "left",
+				cameraPosition: { x: -3, y: 0, z: 10 },
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "reuptake-inhibition",
+				title: "Reuptake Inhibition",
+				text: 'Some medications (like antidepressants) block reuptake. Let\'s try it! Click the "Toggle Reuptake Inhibition" button.',
+				highlight: "inhibitBtn",
+				position: "bottom",
+				action: "waitForInhibition",
+				waitFor: "reuptake-toggled",
+				nextButton: null,
+			},
+			{
+				id: "observe-inhibition",
+				title: "More Neurotransmitters!",
+				text: "With reuptake blocked, neurotransmitters stay in the synapse longer. This is how SSRIs (antidepressants) work!",
+				highlight: null,
+				position: "center",
+				action: null,
+				duration: 3000,
+				nextButton: "Next",
+			},
+			{
+				id: "try-different",
+				title: "Try Different Neurotransmitters",
+				text: "Each neurotransmitter has unique effects:\n• Dopamine: Reward, motivation\n• Serotonin: Mood, well-being\n• GABA: Calming, inhibitory\n• Glutamate: Excitatory, learning\n• Norepinephrine: Alertness, arousal",
+				highlight: "ntType",
+				position: "bottom",
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "reset",
+				title: "Reset the Simulation",
+				text: "You can reset everything at any time with the Reset button. This clears all neurotransmitters and starts fresh.",
+				highlight: "resetBtn",
+				position: "bottom",
+				action: null,
+				nextButton: "Next",
+			},
+			{
+				id: "complete",
+				title: "Tutorial Complete! 🎉",
+				text: "Great job! You now understand the basics of synaptic transmission. Feel free to experiment with different neurotransmitters and settings.",
+				highlight: null,
+				position: "center",
+				action: "complete",
+				nextButton: "Finish",
+			},
+		];
+	}
+
+	setupUI() {
+		// Create tutorial overlay
+		const overlay = document.createElement("div");
+		overlay.id = "tutorial-overlay";
+		overlay.className = "tutorial-overlay";
+		overlay.style.display = "none";
+
+		overlay.innerHTML = `
       <div class="tutorial-backdrop"></div>
       <div class="tutorial-content">
         <div class="tutorial-header">
@@ -210,29 +210,29 @@ export class TutorialManager {
       </div>
       <div class="tutorial-arrow"></div>
     `;
-    
-    document.body.appendChild(overlay);
-    
-    // Create tutorial start button
-    const startBtn = document.createElement('button');
-    startBtn.id = 'tutorial-start-btn';
-    startBtn.className = 'tutorial-start-btn';
-    startBtn.innerHTML = '📚 Start Tutorial';
-    startBtn.addEventListener('click', () => this.start());
-    
-    // Add to controls area
-    const controls = document.querySelector('.controls');
-    if (controls) {
-      controls.insertBefore(startBtn, controls.firstChild);
-    }
-    
-    // Add styles
-    this.addStyles();
-  }
 
-  addStyles() {
-    const style = document.createElement('style');
-    style.textContent = `
+		document.body.appendChild(overlay);
+
+		// Create tutorial start button
+		const startBtn = document.createElement("button");
+		startBtn.id = "tutorial-start-btn";
+		startBtn.className = "tutorial-start-btn";
+		startBtn.innerHTML = "📚 Start Tutorial";
+		startBtn.addEventListener("click", () => this.start());
+
+		// Add to controls area
+		const controls = document.querySelector(".controls");
+		if (controls) {
+			controls.insertBefore(startBtn, controls.firstChild);
+		}
+
+		// Add styles
+		this.addStyles();
+	}
+
+	addStyles() {
+		const style = document.createElement("style");
+		style.textContent = `
       .tutorial-overlay {
         position: fixed;
         top: 0;
@@ -468,243 +468,246 @@ export class TutorialManager {
         box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
       }
     `;
-    document.head.appendChild(style);
-  }
+		document.head.appendChild(style);
+	}
 
-  setupEventListeners() {
-    // Next button
-    document.getElementById('tutorial-next').addEventListener('click', () => {
-      this.next();
-    });
-    
-    // Previous button
-    document.getElementById('tutorial-prev').addEventListener('click', () => {
-      this.previous();
-    });
-    
-    // Skip button
-    document.getElementById('tutorial-skip').addEventListener('click', () => {
-      this.skip();
-    });
-    
-    // Listen for simulation events
-    if (this.eventBus) {
-      this.eventBus.on('nt:released', () => this.handleEvent('nt:released'));
-      this.eventBus.on('nt:bound', () => this.handleEvent('nt:bound'));
-    }
-  }
+	setupEventListeners() {
+		// Next button
+		document.getElementById("tutorial-next").addEventListener("click", () => {
+			this.next();
+		});
 
-  start() {
-    this.isActive = true;
-    this.currentStep = 0;
-    this.showStep(0);
-    
-    // Hide start button
-    const startBtn = document.getElementById('tutorial-start-btn');
-    if (startBtn) startBtn.style.display = 'none';
-  }
+		// Previous button
+		document.getElementById("tutorial-prev").addEventListener("click", () => {
+			this.previous();
+		});
 
-  showStep(index) {
-    if (index < 0 || index >= this.steps.length) return;
-    
-    const step = this.steps[index];
-    const overlay = document.getElementById('tutorial-overlay');
-    const content = overlay.querySelector('.tutorial-content');
-    
-    // Show overlay
-    overlay.style.display = 'block';
-    overlay.classList.add('active');
-    
-    // Update content
-    document.getElementById('tutorial-title').textContent = step.title;
-    document.getElementById('tutorial-text').textContent = step.text;
-    
-    // Update progress
-    const progress = ((index + 1) / this.steps.length) * 100;
-    document.getElementById('tutorial-progress-fill').style.width = `${progress}%`;
-    document.getElementById('tutorial-progress-text').textContent = 
-      `Step ${index + 1} of ${this.steps.length}`;
-    
-    // Position content
-    content.className = 'tutorial-content';
-    if (step.position) {
-      content.classList.add(`position-${step.position}`);
-    }
-    
-    // Update buttons
-    const prevBtn = document.getElementById('tutorial-prev');
-    const nextBtn = document.getElementById('tutorial-next');
-    
-    prevBtn.disabled = index === 0;
-    nextBtn.textContent = step.nextButton || 'Next';
-    nextBtn.disabled = step.waitFor !== undefined;
-    
-    // Clear previous highlights
-    this.clearHighlights();
-    
-    // Highlight element
-    if (step.highlight) {
-      this.highlightElement(step.highlight);
-    }
-    
-    // Move camera
-    if (step.cameraPosition && this.sceneManager) {
-      this.moveCamera(step.cameraPosition);
-    }
-    
-    // Handle actions
-    if (step.action) {
-      this.handleAction(step.action, step);
-    }
-    
-    // Auto-advance after duration
-    if (step.duration && !step.waitFor) {
-      setTimeout(() => {
-        if (this.currentStep === index) {
-          this.next();
-        }
-      }, step.duration);
-    }
-  }
+		// Skip button
+		document.getElementById("tutorial-skip").addEventListener("click", () => {
+			this.skip();
+		});
 
-  highlightElement(elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-      element.classList.add('tutorial-highlight');
-    }
-  }
+		// Listen for simulation events
+		if (this.eventBus) {
+			this.eventBus.on("nt:released", () => this.handleEvent("nt:released"));
+			this.eventBus.on("nt:bound", () => this.handleEvent("nt:bound"));
+		}
+	}
 
-  clearHighlights() {
-    document.querySelectorAll('.tutorial-highlight').forEach(el => {
-      el.classList.remove('tutorial-highlight');
-    });
-  }
+	start() {
+		this.isActive = true;
+		this.currentStep = 0;
+		this.showStep(0);
 
-  moveCamera(position) {
-    // Smooth camera transition
-    const duration = 1000;
-    const startPos = this.sceneManager.camera.position.clone();
-    const startTime = Date.now();
-    
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // Ease out cubic
-      
-      this.sceneManager.camera.position.lerpVectors(
-        startPos,
-        new THREE.Vector3(position.x, position.y, position.z),
-        eased
-      );
-      
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-    
-    animate();
-  }
+		// Hide start button
+		const startBtn = document.getElementById("tutorial-start-btn");
+		if (startBtn) startBtn.style.display = "none";
+	}
 
-  handleAction(action, step) {
-    switch (action) {
-      case 'selectNeurotransmitter':
-        // Wait for user to select NT
-        const ntSelect = document.getElementById('ntType');
-        if (ntSelect) {
-          const handler = () => {
-            this.handleEvent('nt-selected');
-            ntSelect.removeEventListener('change', handler);
-          };
-          ntSelect.addEventListener('change', handler);
-        }
-        break;
-        
-      case 'waitForRelease':
-        // Handled by event listener
-        break;
-        
-      case 'waitForBinding':
-        // Handled by event listener
-        break;
-        
-      case 'waitForInhibition':
-        const inhibitBtn = document.getElementById('inhibitBtn');
-        if (inhibitBtn) {
-          const handler = () => {
-            this.handleEvent('reuptake-toggled');
-            inhibitBtn.removeEventListener('click', handler);
-          };
-          inhibitBtn.addEventListener('click', handler);
-        }
-        break;
-        
-      case 'complete':
-        this.completed = true;
-        break;
-    }
-  }
+	showStep(index) {
+		if (index < 0 || index >= this.steps.length) return;
 
-  handleEvent(eventName) {
-    const step = this.steps[this.currentStep];
-    if (step && step.waitFor === eventName) {
-      // Enable next button
-      document.getElementById('tutorial-next').disabled = false;
-      
-      // Auto-advance after short delay
-      setTimeout(() => {
-        if (this.currentStep < this.steps.length - 1) {
-          this.next();
-        }
-      }, 1500);
-    }
-  }
+		const step = this.steps[index];
+		const overlay = document.getElementById("tutorial-overlay");
+		const content = overlay.querySelector(".tutorial-content");
 
-  next() {
-    if (this.currentStep < this.steps.length - 1) {
-      this.currentStep++;
-      this.showStep(this.currentStep);
-    } else {
-      this.finish();
-    }
-  }
+		// Show overlay
+		overlay.style.display = "block";
+		overlay.classList.add("active");
 
-  previous() {
-    if (this.currentStep > 0) {
-      this.currentStep--;
-      this.showStep(this.currentStep);
-    }
-  }
+		// Update content
+		document.getElementById("tutorial-title").textContent = step.title;
+		document.getElementById("tutorial-text").textContent = step.text;
 
-  skip() {
-    if (confirm('Are you sure you want to skip the tutorial?')) {
-      this.finish();
-    }
-  }
+		// Update progress
+		const progress = ((index + 1) / this.steps.length) * 100;
+		document.getElementById("tutorial-progress-fill").style.width =
+			`${progress}%`;
+		document.getElementById("tutorial-progress-text").textContent =
+			`Step ${index + 1} of ${this.steps.length}`;
 
-  finish() {
-    this.isActive = false;
-    this.clearHighlights();
-    
-    const overlay = document.getElementById('tutorial-overlay');
-    overlay.style.display = 'none';
-    overlay.classList.remove('active');
-    
-    // Show start button again
-    const startBtn = document.getElementById('tutorial-start-btn');
-    if (startBtn) {
-      startBtn.style.display = 'block';
-      startBtn.innerHTML = '📚 Restart Tutorial';
-    }
-    
-    // Show completion message
-    if (this.completed) {
-      this.showCompletionMessage();
-    }
-  }
+		// Position content
+		content.className = "tutorial-content";
+		if (step.position) {
+			content.classList.add(`position-${step.position}`);
+		}
 
-  showCompletionMessage() {
-    const message = document.createElement('div');
-    message.style.cssText = `
+		// Update buttons
+		const prevBtn = document.getElementById("tutorial-prev");
+		const nextBtn = document.getElementById("tutorial-next");
+
+		prevBtn.disabled = index === 0;
+		nextBtn.textContent = step.nextButton || "Next";
+		nextBtn.disabled = step.waitFor !== undefined;
+
+		// Clear previous highlights
+		this.clearHighlights();
+
+		// Highlight element
+		if (step.highlight) {
+			this.highlightElement(step.highlight);
+		}
+
+		// Move camera
+		if (step.cameraPosition && this.sceneManager) {
+			this.moveCamera(step.cameraPosition);
+		}
+
+		// Handle actions
+		if (step.action) {
+			this.handleAction(step.action, step);
+		}
+
+		// Auto-advance after duration
+		if (step.duration && !step.waitFor) {
+			setTimeout(() => {
+				if (this.currentStep === index) {
+					this.next();
+				}
+			}, step.duration);
+		}
+	}
+
+	highlightElement(elementId) {
+		const element = document.getElementById(elementId);
+		if (element) {
+			element.classList.add("tutorial-highlight");
+		}
+	}
+
+	clearHighlights() {
+		document.querySelectorAll(".tutorial-highlight").forEach((el) => {
+			el.classList.remove("tutorial-highlight");
+		});
+	}
+
+	moveCamera(position) {
+		// Smooth camera transition
+		const duration = 1000;
+		const startPos = this.sceneManager.camera.position.clone();
+		const startTime = Date.now();
+
+		const animate = () => {
+			const elapsed = Date.now() - startTime;
+			const progress = Math.min(elapsed / duration, 1);
+			const eased = 1 - (1 - progress) ** 3; // Ease out cubic
+
+			this.sceneManager.camera.position.lerpVectors(
+				startPos,
+				new THREE.Vector3(position.x, position.y, position.z),
+				eased,
+			);
+
+			if (progress < 1) {
+				requestAnimationFrame(animate);
+			}
+		};
+
+		animate();
+	}
+
+	handleAction(action, step) {
+		switch (action) {
+			case "selectNeurotransmitter": {
+				// Wait for user to select NT
+				const ntSelect = document.getElementById("ntType");
+				if (ntSelect) {
+					const handler = () => {
+						this.handleEvent("nt-selected");
+						ntSelect.removeEventListener("change", handler);
+					};
+					ntSelect.addEventListener("change", handler);
+				}
+				break;
+			}
+
+			case "waitForRelease":
+				// Handled by event listener
+				break;
+
+			case "waitForBinding":
+				// Handled by event listener
+				break;
+
+			case "waitForInhibition": {
+				const inhibitBtn = document.getElementById("inhibitBtn");
+				if (inhibitBtn) {
+					const handler = () => {
+						this.handleEvent("reuptake-toggled");
+						inhibitBtn.removeEventListener("click", handler);
+					};
+					inhibitBtn.addEventListener("click", handler);
+				}
+				break;
+			}
+
+			case "complete":
+				this.completed = true;
+				break;
+		}
+	}
+
+	handleEvent(eventName) {
+		const step = this.steps[this.currentStep];
+		if (step && step.waitFor === eventName) {
+			// Enable next button
+			document.getElementById("tutorial-next").disabled = false;
+
+			// Auto-advance after short delay
+			setTimeout(() => {
+				if (this.currentStep < this.steps.length - 1) {
+					this.next();
+				}
+			}, 1500);
+		}
+	}
+
+	next() {
+		if (this.currentStep < this.steps.length - 1) {
+			this.currentStep++;
+			this.showStep(this.currentStep);
+		} else {
+			this.finish();
+		}
+	}
+
+	previous() {
+		if (this.currentStep > 0) {
+			this.currentStep--;
+			this.showStep(this.currentStep);
+		}
+	}
+
+	skip() {
+		if (confirm("Are you sure you want to skip the tutorial?")) {
+			this.finish();
+		}
+	}
+
+	finish() {
+		this.isActive = false;
+		this.clearHighlights();
+
+		const overlay = document.getElementById("tutorial-overlay");
+		overlay.style.display = "none";
+		overlay.classList.remove("active");
+
+		// Show start button again
+		const startBtn = document.getElementById("tutorial-start-btn");
+		if (startBtn) {
+			startBtn.style.display = "block";
+			startBtn.innerHTML = "📚 Restart Tutorial";
+		}
+
+		// Show completion message
+		if (this.completed) {
+			this.showCompletionMessage();
+		}
+	}
+
+	showCompletionMessage() {
+		const message = document.createElement("div");
+		message.style.cssText = `
       position: fixed;
       top: 50%;
       left: 50%;
@@ -718,8 +721,8 @@ export class TutorialManager {
       text-align: center;
       animation: tutorialSlideIn 0.3s ease-out;
     `;
-    
-    message.innerHTML = `
+
+		message.innerHTML = `
       <h2 style="margin: 0 0 16px 0; font-size: 28px;">🎉 Tutorial Complete!</h2>
       <p style="margin: 0 0 20px 0; font-size: 16px;">
         You've learned the basics of synaptic transmission.<br>
@@ -736,15 +739,15 @@ export class TutorialManager {
         cursor: pointer;
       ">Got it!</button>
     `;
-    
-    document.body.appendChild(message);
-    
-    document.getElementById('completion-ok').addEventListener('click', () => {
-      message.remove();
-    });
-    
-    setTimeout(() => {
-      message.remove();
-    }, 5000);
-  }
+
+		document.body.appendChild(message);
+
+		document.getElementById("completion-ok").addEventListener("click", () => {
+			message.remove();
+		});
+
+		setTimeout(() => {
+			message.remove();
+		}, 5000);
+	}
 }

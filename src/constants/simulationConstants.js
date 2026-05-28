@@ -15,12 +15,12 @@ export const UNBINDING_PROBABILITY = 0.0005; // Per-frame probability of unbindi
 // SPATIAL GRID CONFIGURATION
 // ============================================================================
 export const SPATIAL_GRID_BOUNDS = {
-  minX: -5,
-  maxX: 6,
-  minY: -5,
-  maxY: 5,
-  minZ: -4,
-  maxZ: 4
+	minX: -5,
+	maxX: 6,
+	minY: -5,
+	maxY: 5,
+	minZ: -4,
+	maxZ: 4,
 };
 export const SPATIAL_GRID_CELL_SIZE = 1.5; // Optimized for 0.6 binding radius
 
@@ -107,24 +107,24 @@ export const RECEPTOR_BINDING_SITE_OFFSET = -0.3;
 // RECEPTOR COLORS
 // ============================================================================
 export const RECEPTOR_COLORS = {
-  INACTIVE: {
-    base: 0x666666,
-    emissive: 0x222222,
-    baseEmissiveIntensity: 0.3,
-    bindingSite: 0x888888,
-    bindingSiteEmissive: 0x333333,
-    bindingSiteEmissiveIntensity: 0.4
-  },
-  EXCITATORY: {
-    color: 0xff6666,
-    emissiveIntensity: 0.7,
-    bindingSiteEmissiveIntensity: 0.8
-  },
-  INHIBITORY: {
-    color: 0x66ff66,
-    emissiveIntensity: 0.7,
-    bindingSiteEmissiveIntensity: 0.8
-  }
+	INACTIVE: {
+		base: 0x666666,
+		emissive: 0x222222,
+		baseEmissiveIntensity: 0.3,
+		bindingSite: 0x888888,
+		bindingSiteEmissive: 0x333333,
+		bindingSiteEmissiveIntensity: 0.4,
+	},
+	EXCITATORY: {
+		color: 0xff6666,
+		emissiveIntensity: 0.7,
+		bindingSiteEmissiveIntensity: 0.8,
+	},
+	INHIBITORY: {
+		color: 0x66ff66,
+		emissiveIntensity: 0.7,
+		bindingSiteEmissiveIntensity: 0.8,
+	},
 };
 
 // ============================================================================
@@ -174,18 +174,18 @@ export const TRANSPORTER_POSITION_OFFSET_POST = 3.5; // Postsynaptic
 // TRANSPORTER COLORS
 // ============================================================================
 export const TRANSPORTER_COLORS = {
-  ACTIVE: {
-    channel: 0xff9933,
-    emissive: 0x884400,
-    emissiveIntensity: 0.3,
-    opacity: 0.85
-  },
-  INHIBITED: {
-    channel: 0xff0000,
-    emissive: 0xaa0000,
-    emissiveIntensity: 0.8,
-    opacity: 0.6
-  }
+	ACTIVE: {
+		channel: 0xff9933,
+		emissive: 0x884400,
+		emissiveIntensity: 0.3,
+		opacity: 0.85,
+	},
+	INHIBITED: {
+		channel: 0xff0000,
+		emissive: 0xaa0000,
+		emissiveIntensity: 0.8,
+		opacity: 0.6,
+	},
 };
 
 // ============================================================================
@@ -263,58 +263,58 @@ export const REUPTAKE_ANIMATION_STEP = 0.02;
 // MATERIAL PROPERTIES
 // ============================================================================
 export const MATERIAL_DEFAULTS = {
-  neuron: {
-    color: 0xffbb77,
-    opacity: 0.85,
-    roughness: 0.4,
-    metalness: 0.1,
-    emissive: 0x442200,
-    emissiveIntensity: 0.1
-  },
-  nucleus: {
-    color: 0x5555cc,
-    opacity: 0.9,
-    roughness: 0.3,
-    metalness: 0.2,
-    emissive: 0x222266,
-    emissiveIntensity: 0.3
-  },
-  myelin: {
-    color: 0xffffff,
-    opacity: 0.7,
-    roughness: 0.2,
-    metalness: 0.3,
-    emissive: 0xccccff,
-    emissiveIntensity: 0.1
-  },
-  synapticCleft: {
-    color: 0x88aaff,
-    opacity: 0.15,
-    roughness: 0.8,
-    metalness: 0.2,
-    emissive: 0x4466ff,
-    emissiveIntensity: 0
-  },
-  degradationParticle: {
-    color: 0xff4444,
-    opacity: 0.5
-  }
+	neuron: {
+		color: 0xffbb77,
+		opacity: 0.85,
+		roughness: 0.4,
+		metalness: 0.1,
+		emissive: 0x442200,
+		emissiveIntensity: 0.1,
+	},
+	nucleus: {
+		color: 0x5555cc,
+		opacity: 0.9,
+		roughness: 0.3,
+		metalness: 0.2,
+		emissive: 0x222266,
+		emissiveIntensity: 0.3,
+	},
+	myelin: {
+		color: 0xffffff,
+		opacity: 0.7,
+		roughness: 0.2,
+		metalness: 0.3,
+		emissive: 0xccccff,
+		emissiveIntensity: 0.1,
+	},
+	synapticCleft: {
+		color: 0x88aaff,
+		opacity: 0.15,
+		roughness: 0.8,
+		metalness: 0.2,
+		emissive: 0x4466ff,
+		emissiveIntensity: 0,
+	},
+	degradationParticle: {
+		color: 0xff4444,
+		opacity: 0.5,
+	},
 };
 
 // ============================================================================
 // PHYSICS & MOVEMENT
 // ============================================================================
 export const UNBIND_VELOCITY = {
-  x: -0.02,
-  xRandom: 0.01,
-  yRange: 0.03,
-  zRange: 0.03
+	x: -0.02,
+	xRandom: 0.01,
+	yRange: 0.03,
+	zRange: 0.03,
 };
 
 export const BOUNDARY_LIMITS = {
-  y: { min: -4, max: 4 },
-  z: { min: -3, max: 3 },
-  xMax: 6
+	y: { min: -4, max: 4 },
+	z: { min: -3, max: 3 },
+	xMax: 6,
 };
 
 // ============================================================================
