@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"skills": {
+		"jscpd": {
+			"source": "kucherenko/jscpd",
+			"sourceType": "github",
+			"skillPath": "skills/jscpd/SKILL.md",
+			"computedHash": "12ad0f311081e9491146a02d4bf01c69c8b136e2563623589b95c3b4e1a27df3"
+		}
+	}
+}
