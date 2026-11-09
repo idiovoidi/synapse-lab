@@ -74,13 +74,14 @@ const STEPS = [
 	{
 		title: "Drugs change the rules",
 		body: [
-			"Switch to serotonin and turn on the reuptake inhibitor. This is how SSRIs work: transmitter stays in the cleft longer, so receptors stay busy.",
+			"At this serotonergic synapse, turn on fluoxetine (Prozac). It blocks only SERT, so serotonin stays in the cleft longer and receptors stay busy.",
+			"Then try it at a dopamine synapse: no effect. Selectivity is what separates an SSRI from cocaine.",
 		],
 		target: "pharmacology",
 		transmitter: "SEROTONIN",
 		task: {
-			label: "Turn on the reuptake inhibitor",
-			event: "flag:reuptakeBlocked",
+			label: "Turn on fluoxetine",
+			event: "drug:FLUOXETINE",
 		},
 	},
 	{
@@ -94,7 +95,7 @@ const STEPS = [
 	{
 		title: "Your lab now",
 		body: [
-			"Try auto-fire at high rates to deplete the vesicle pool, compare GABA with glutamate, or block enzymes with dopamine.",
+			"Try amphetamine at a dopamine synapse (release with no spikes), haloperidol's grey caps on D2 receptors, diazepam on GABA, or auto-fire at high rates to deplete the vesicle pool.",
 			"Press ? for keyboard shortcuts. Have fun!",
 		],
 		target: "dock",
@@ -130,22 +131,12 @@ export class Tour {
 			if (e.key === "ArrowLeft" && !e.target.closest?.("input")) this.prev();
 		};
 
-		for (const event of [
-			"vesicle:fused",
-			"nt:bound",
-			"post:spike",
-			"settings:changed",
-		]) {
-			bus.on(event, (payload) => {
-				if (event === "settings:changed") {
-					for (const [k, v] of Object.entries(payload ?? {})) {
-						if (v) this._complete(`flag:${k}`);
-					}
-				} else {
-					this._complete(event);
-				}
-			});
+		for (const event of ["vesicle:fused", "nt:bound", "post:spike"]) {
+			bus.on(event, () => this._complete(event));
 		}
+		bus.on("drug:changed", ({ key, dose }) => {
+			if (dose > 0) this._complete(`drug:${key}`);
+		});
 		bus.on("ui:tour", () => (this.active ? this.end() : this.start()));
 	}
 

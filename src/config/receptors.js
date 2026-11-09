@@ -51,7 +51,7 @@ export const RECEPTOR_TYPES = {
 		effector: "cation",
 		affinity: 0.9,
 		dwell: 2,
-		gain: 1.1,
+		gain: 4,
 		mgBlock: true,
 		note: "Plugged by Mg²⁺ at rest; opens only when the cell is already depolarised (coincidence detector).",
 	},

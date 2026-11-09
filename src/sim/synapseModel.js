@@ -1,3 +1,4 @@
+import { DRUGS, occupancy } from "../config/drugs.js";
 import { NEUROTRANSMITTERS, NT_ORDER } from "../config/neurotransmitters.js";
 import {
 	isExcitatory,
@@ -15,6 +16,7 @@ import {
 	MEMBRANE,
 	MESSENGER,
 	PARTICLE,
+	PHARMACOLOGY,
 	RECEPTORS,
 	RELEASE,
 	TONE,
@@ -46,12 +48,13 @@ export class SynapseModel {
 		this.settings = {
 			transmitter: "GLUTAMATE",
 			releaseProbability: RELEASE.probability,
-			reuptakeBlocked: false,
-			enzymesBlocked: false,
-			antagonist: false,
 			autoFire: false,
 			fireRate: 1.5,
 		};
+
+		/** Active drugs: key → relative dose. */
+		this.drugs = {};
+		this._recomputeDrugEffects();
 
 		this.receptors = this._createReceptors();
 		this.autoreceptors = this._createAutoreceptors();
@@ -90,6 +93,7 @@ export class SynapseModel {
 		this.autoBrake = 0;
 
 		this.cytosol = this.cytosolSetpoint;
+		this._effluxAccumulator = 0;
 		/** Smoothed MAO breakdown rate (molecules/s). */
 		this.maoActivity = 0;
 		this._maoAccumulator = 0;
@@ -107,20 +111,23 @@ export class SynapseModel {
 			spikes: 0,
 			failures: 0,
 			injected: 0,
+			effluxed: 0,
 		};
 
 		for (const r of this._allReceptors) {
 			r.particle = null;
 			r.activation = 0;
 			r.refractoryUntil = 0;
+			r.drug = null;
+			r.blocked = false;
 		}
 		for (const t of this.transporters) t.flash = 0;
 		for (const e of this.enzymes) e.flash = 0;
 		for (const v of this.vesicles) {
 			this._placeVesicle(v);
 			v.content = VESICLES.transmittersPerVesicle;
+			v.leak = 0;
 		}
-		this._applyAntagonist();
 
 		this.history = {
 			free: new Float32Array(HISTORY.length),
@@ -150,14 +157,70 @@ export class SynapseModel {
 	}
 
 	/**
-	 * @param {"reuptakeBlocked" | "enzymesBlocked" | "antagonist" | "autoFire"} flag
+	 * @param {"autoFire"} flag
 	 * @param {boolean} [value]
 	 */
 	setFlag(flag, value = !this.settings[flag]) {
 		this.settings[flag] = Boolean(value);
-		if (flag === "antagonist") this._applyAntagonist();
 		if (flag === "autoFire") this._autoPhase = 0.999; // fire promptly
 		this.emit("settings:changed", { [flag]: this.settings[flag] });
+	}
+
+	/**
+	 * Apply a drug at a relative dose (0 removes it).
+	 * @param {string} key
+	 * @param {number} dose
+	 */
+	setDrug(key, dose) {
+		if (!DRUGS[key]) return;
+		if (dose > 0) this.drugs[key] = dose;
+		else delete this.drugs[key];
+		this._recomputeDrugEffects();
+		this.emit("drug:changed", { key, dose: this.drugs[key] ?? 0 });
+	}
+
+	/**
+	 * A drug's targets, its occupancy of each, and whether each target
+	 * exists at the current synapse.
+	 * @param {string} key
+	 * @param {number} [dose]
+	 */
+	drugTargets(key, dose = this.drugs[key] ?? DRUGS[key].defaultDose) {
+		const nt = this.transmitter;
+		const receptorsHere = new Set([
+			...nt.postsynaptic.map(([k]) => k),
+			nt.autoreceptor,
+		]);
+		return DRUGS[key].targets.map((t) => {
+			let present;
+			switch (t.action) {
+				case "transporterBlock":
+				case "transporterReverse":
+					present = t.target === nt.transporter;
+					break;
+				case "vmatDisrupt":
+					present = !nt.aminoAcid;
+					break;
+				case "enzymeInhibit":
+					present = t.target === "MAO" && nt.mao;
+					break;
+				default:
+					present = receptorsHere.has(t.target);
+			}
+			return { ...t, occupancy: occupancy(dose, t.ki), present };
+		});
+	}
+
+	/** Fraction of D2-type (or any) receptors currently capped by an antagonist. */
+	antagonistOccupancy(typeKey) {
+		let n = 0;
+		let blocked = 0;
+		for (const r of this._allReceptors) {
+			if (r.type.key !== typeKey) continue;
+			n++;
+			if (r.drug) blocked++;
+		}
+		return n === 0 ? 0 : blocked / n;
 	}
 
 	/** @param {number} hz */
@@ -259,6 +322,16 @@ export class SynapseModel {
 		);
 	}
 
+	/** Fraction of normal reuptake capacity left after drugs (0–1). */
+	get reuptakeCapacity() {
+		return this._transportFraction();
+	}
+
+	/** Strength of transporter reversal by releasers at this synapse (0–1). */
+	get transporterReversal() {
+		return this.effects.transporterReverse[this.transmitter.transporter] || 0;
+	}
+
 	/** Steady-state cytosolic level for the current transmitter. */
 	get cytosolSetpoint() {
 		const s = CYTOSOL.synthesis;
@@ -270,6 +343,42 @@ export class SynapseModel {
 	// Fixtures
 	// ---------------------------------------------------------------------
 
+	/**
+	 * Combine all active drugs into per-target effect strengths. Drugs acting
+	 * on the same target compete for it, so their dose/Ki ratios add before
+	 * the mass-action saturation.
+	 */
+	_recomputeDrugEffects() {
+		const ratios = {};
+		const firstDrug = {};
+		for (const [key, dose] of Object.entries(this.drugs)) {
+			for (const t of DRUGS[key].targets) {
+				const id = `${t.action}:${t.target}`;
+				ratios[id] = (ratios[id] || 0) + dose / t.ki;
+				firstDrug[id] ??= key;
+			}
+		}
+		const effects = {
+			transporterBlock: {},
+			transporterReverse: {},
+			vmatDisrupt: 0,
+			antagonist: {},
+			antagonistDrug: {},
+			pam: {},
+			channelBlock: {},
+			enzymeInhibit: {},
+		};
+		for (const [id, ratio] of Object.entries(ratios)) {
+			const [action, target] = id.split(":");
+			const occ = ratio / (1 + ratio);
+			if (action === "vmatDisrupt") effects.vmatDisrupt = occ;
+			else effects[action][target] = occ;
+			if (action === "antagonist")
+				effects.antagonistDrug[target] = firstDrug[id];
+		}
+		this.effects = effects;
+	}
+
 	_receptorSlot(side, x, y, z, id) {
 		return {
 			id,
@@ -280,7 +389,8 @@ export class SynapseModel {
 			x,
 			y,
 			z,
-			antagonistSlot: this.rng.next() < RECEPTORS.antagonistFraction,
+			/** Antagonist currently capping this receptor, if any. */
+			drug: null,
 			blocked: false,
 			particle: null,
 			activation: 0,
@@ -405,7 +515,15 @@ export class SynapseModel {
 					minGap * minGap,
 			);
 			if (!clash) {
-				list.push({ id: list.length, home, x: 0, y: 0, z: 0, content: 0 });
+				list.push({
+					id: list.length,
+					home,
+					x: 0,
+					y: 0,
+					z: 0,
+					content: 0,
+					leak: 0,
+				});
 			}
 		}
 		return list;
@@ -430,6 +548,10 @@ export class SynapseModel {
 	_setReceptorType(r, key) {
 		const type = RECEPTOR_TYPES[key];
 		if (r.particle && r.particle.type !== type.ligand) this._unbind(r.particle);
+		if (r.type !== type) {
+			r.drug = null;
+			r.blocked = false;
+		}
 		r.type = type;
 	}
 
@@ -458,13 +580,6 @@ export class SynapseModel {
 		const taken = Math.min(target, Math.floor(this.cytosol));
 		this.cytosol -= taken;
 		v.content = taken;
-	}
-
-	_applyAntagonist() {
-		for (const r of this.receptors) {
-			r.blocked = this.settings.antagonist && r.antagonistSlot;
-			if (r.blocked && r.particle) this._unbind(r.particle);
-		}
 	}
 
 	// ---------------------------------------------------------------------
@@ -542,6 +657,8 @@ export class SynapseModel {
 		this._updateEnzymes(h);
 		this._updateParticles(h);
 		this._updateReceptors(h);
+		this._updateAntagonists(h);
+		this._updateReleasers(h);
 		this._updateAutoreceptorBrake(h);
 		this._updateMembrane(h);
 		this._updateTone(h);
@@ -564,8 +681,9 @@ export class SynapseModel {
 			CYTOSOL.synthesis * (1 - this.cytosol / CYTOSOL.capacity) * h;
 
 		let maoRate = 0;
-		if (this.transmitter.mao && !this.settings.enzymesBlocked) {
-			maoRate = CYTOSOL.mao * this.cytosol;
+		const maoInhibition = this.effects.enzymeInhibit.MAO || 0;
+		if (this.transmitter.mao) {
+			maoRate = CYTOSOL.mao * this.cytosol * (1 - maoInhibition);
 			const broken = maoRate * h;
 			this.cytosol -= broken;
 			this._maoAccumulator += broken;
@@ -739,12 +857,9 @@ export class SynapseModel {
 		}
 
 		// Transporters carry only this synapse's transmitter (DAT, SERT, EAAT…).
-		if (
-			!this.settings.reuptakeBlocked &&
-			p.type === this.settings.transmitter &&
-			radial > 1.5
-		) {
-			const chance = 1 - Math.exp(-nt.reuptake * h);
+		const transport = this._transportFraction();
+		if (transport > 0 && p.type === this.settings.transmitter && radial > 1.5) {
+			const chance = 1 - Math.exp(-nt.reuptake * transport * h);
 			for (const t of this.transporters) {
 				if (!t.active) continue;
 				if (dist2(p, t) < TRANSPORTERS.captureRadius ** 2) {
@@ -762,7 +877,7 @@ export class SynapseModel {
 		}
 
 		// COMT on glia and the postsynaptic side breaks down catecholamines.
-		if (!this.settings.enzymesBlocked && nt.enzymatic > 0 && radial > 2) {
+		if (nt.enzymatic > 0 && radial > 2) {
 			const chance = 1 - Math.exp(-nt.enzymatic * h);
 			for (const e of this.enzymes) {
 				if (dist2(p, e) < ENZYMES.captureRadius ** 2) {
@@ -811,7 +926,10 @@ export class SynapseModel {
 		p.x = best.x + inward * PARTICLE.radius * 2.6;
 		p.y = best.y;
 		p.z = best.z;
-		p.unbindAt = this.time + this.rng.exponential(best.type.dwell);
+		// Benzodiazepine-like modulators keep the channel open longer.
+		const pam = this.effects.pam[best.type.key] || 0;
+		const dwell = best.type.dwell * (1 + PHARMACOLOGY.pamDwell * pam);
+		p.unbindAt = this.time + this.rng.exponential(dwell);
 		best.particle = p;
 		best.lastType = p.type;
 		this.stats.bindings++;
@@ -846,6 +964,82 @@ export class SynapseModel {
 		}
 	}
 
+	/** Fraction of normal reuptake capacity left after drugs. */
+	_transportFraction() {
+		const key = this.transmitter.transporter;
+		const block = this.effects.transporterBlock[key] || 0;
+		// A transporter substrate (amphetamine) competes with normal uptake.
+		const substrate =
+			(this.effects.transporterReverse[key] || 0) *
+			PHARMACOLOGY.substrateCompetition;
+		return (1 - block) * (1 - substrate);
+	}
+
+	/**
+	 * Competitive antagonists bind and leave receptors stochastically. With
+	 * no agonist around, the fraction capped settles at the mass-action
+	 * occupancy; a receptor holding its agonist cannot be capped, so heavy
+	 * transmitter release competes the antagonist off.
+	 */
+	_updateAntagonists(h) {
+		const koff = PHARMACOLOGY.antagonistKoff;
+		const pOff = 1 - Math.exp(-koff * h);
+		for (const r of this._allReceptors) {
+			const occ = Math.min(0.98, this.effects.antagonist[r.type.key] || 0);
+			if (r.drug) {
+				if (this.rng.next() < pOff) {
+					r.drug = null;
+					r.blocked = false;
+				}
+			} else if (occ > 0 && !r.particle) {
+				const kon = (koff * occ) / (1 - occ);
+				if (this.rng.next() < 1 - Math.exp(-kon * h)) {
+					r.drug = this.effects.antagonistDrug[r.type.key];
+					r.blocked = true;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Amphetamine-like releasers: VMAT disruption empties vesicles into the
+	 * cytosol, and reversed transporters pump cytosolic transmitter out into
+	 * the cleft without any action potential.
+	 */
+	_updateReleasers(h) {
+		const nt = this.transmitter;
+		const vmat = nt.aminoAcid ? 0 : this.effects.vmatDisrupt;
+		if (vmat > 0) {
+			for (const v of this.vesicles) {
+				if (v.state !== "ready" || v.content <= 0) continue;
+				v.leak += PHARMACOLOGY.vmatLeak * vmat * v.content * h;
+				while (v.leak >= 1 && v.content > 0) {
+					v.leak -= 1;
+					v.content--;
+					this.cytosol += 1;
+				}
+			}
+		}
+
+		const reverse = this.effects.transporterReverse[nt.transporter] || 0;
+		if (reverse <= 0) return;
+		const pumps = this.transporters.filter((t) => t.active && t.side === "pre");
+		const rate =
+			PHARMACOLOGY.efflux *
+			reverse *
+			pumps.length *
+			Math.min(2, this.cytosol / this.cytosolSetpoint);
+		this._effluxAccumulator += rate * h;
+		while (this._effluxAccumulator >= 1 && this.cytosol >= 1) {
+			this._effluxAccumulator -= 1;
+			const t = pumps[Math.floor(this.rng.next() * pumps.length)];
+			if (!this._spawnParticle(nt.key, t.y * 0.92, t.z * 0.92)) break;
+			this.cytosol -= 1;
+			this.stats.effluxed++;
+			t.flash = 1;
+		}
+	}
+
 	/** Gi-coupled autoreceptors throttle release with G-protein kinetics. */
 	_updateAutoreceptorBrake(h) {
 		let bound = 0;
@@ -870,6 +1064,8 @@ export class SynapseModel {
 			}
 			let g = MEMBRANE.conductance * type.gain;
 			if (type.mgBlock) g *= nmdaUnblocked(v);
+			g *= 1 + PHARMACOLOGY.pamConductance * (this.effects.pam[type.key] || 0);
+			g *= 1 - (this.effects.channelBlock[type.key] || 0);
 			if (type.effector === "cation") gCation += g;
 			else gChloride += g;
 		}

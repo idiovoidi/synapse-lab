@@ -29,7 +29,6 @@ const PALETTE = {
 	transporter: "#dcd6c4",
 	transporterBlocked: "#ff4d6d",
 	enzyme: "#ff7ad9",
-	enzymeBlocked: "#4a4560",
 	calcium: "#ffe066",
 	actionPotential: "#ffe7a3",
 	vesicleShell: "#cdd6ff",
@@ -785,21 +784,25 @@ export class SynapseView {
 	}
 
 	_syncTransporters() {
-		const blocked = this.model.settings.reuptakeBlocked;
+		const block = 1 - this.model.reuptakeCapacity;
+		const reversed = this.model.transporterReversal;
 		for (const view of this.transporterViews) {
 			view.group.visible = view.model.active;
 			if (!view.model.active) continue;
 			const flash = view.model.flash;
-			view.material.color.set(
-				blocked ? PALETTE.transporterBlocked : PALETTE.transporter,
+			// Blocked transporters turn red; reversed ones (amphetamine) amber.
+			view.material.color
+				.set(PALETTE.transporter)
+				.lerp(BLOCKED, block)
+				.lerp(REVERSED, view.model.side === "pre" ? reversed : 0);
+			view.material.emissive.set(
+				reversed > 0 ? "#ff9a2e" : block > 0.5 ? "#7a0f24" : "#ffcf70",
 			);
-			view.material.emissive.set(blocked ? "#7a0f24" : "#ffcf70");
-			view.material.emissiveIntensity = blocked ? 0.35 : flash * 1.2;
+			view.material.emissiveIntensity = Math.max(block * 0.35, flash * 1.2);
 		}
 	}
 
 	_syncEnzymes(dt) {
-		const blocked = this.model.settings.enzymesBlocked;
 		// COMT only matters for catecholamines (dopamine, norepinephrine).
 		const present = this.model.transmitter.enzymatic > 0;
 		this.comtLabel.visible = present;
@@ -810,8 +813,7 @@ export class SynapseView {
 			view.mesh.position.set(e.x, e.y, e.z);
 			view.mesh.rotation.y += dt * 0.6;
 			view.mesh.scale.setScalar(1 + e.flash * 0.35);
-			view.material.color.set(blocked ? PALETTE.enzymeBlocked : PALETTE.enzyme);
-			view.material.emissiveIntensity = blocked ? 0 : 0.2 + e.flash * 1.1;
+			view.material.emissiveIntensity = 0.2 + e.flash * 1.1;
 		}
 	}
 
@@ -874,6 +876,8 @@ export class SynapseView {
 
 const GREY = new THREE.Color("#3a3a46");
 const EXCITATORY = new THREE.Color(PALETTE.excitatory);
+const BLOCKED = new THREE.Color(PALETTE.transporterBlocked);
+const REVERSED = new THREE.Color("#ffa63d");
 const INHIBITORY = new THREE.Color(PALETTE.inhibitory);
 
 function easeOutBack(t) {

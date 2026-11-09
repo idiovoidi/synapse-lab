@@ -20,12 +20,12 @@ npm run lint    # Biome
 
 | | |
 |---|---|
-| **Five transmitters** | Glutamate, GABA, dopamine, serotonin and norepinephrine, each with its own diffusion, affinity, dwell time, clearance routes and postsynaptic efficacy. |
-| **Stimulate** | Fire single action potentials or auto-fire at 0.5 to 6 Hz. Set how many vesicles fuse per spike and watch the readily releasable pool deplete and recover. |
-| **Pharmacology** | Reuptake inhibitor (SSRIs, cocaine), enzyme inhibitor (MAOIs) and receptor antagonist (antipsychotics). Each produces a measurable, explained effect. |
-| **Postsynaptic response** | A conductance-based membrane model sums excitatory and inhibitory input. Cross −50 mV and the cell fires. Neuromodulators depolarise but can't fire it alone. |
-| **Live readouts** | 20-second traces of membrane potential, free transmitter and receptor occupancy, plus clearance counters. |
-| **Body & mood** | Slow transmitter "tone" drives a stylised mood face and heart rate (ECG). Simplified for teaching, not a clinical model. |
+| **Five synapse types** | Glutamatergic, GABAergic, dopaminergic, serotonergic and noradrenergic. Each has its own receptor subtype mix (AMPA/NMDA, GABA-A, D1/D2, 5-HT1A/2A, α1/β1/α2), autoreceptor, transporter and clearance route. Receptors and transporters only recognise their own ligand. |
+| **Stimulate** | Fire single action potentials or auto-fire at 0.5 to 6 Hz. Each docked vesicle fuses with a set release probability, so release is stochastic, and autoreceptors brake it. Watch the pool deplete and recover, and vesicle fill track the cytosolic store. |
+| **Pharmacology** | Ten real drugs: fluoxetine, sertraline, cocaine, methylphenidate, amphetamine, haloperidol, risperidone, diazepam, phenelzine, ketamine. Each has a dose slider; occupancy follows dose ÷ (dose + Ki), and each drug only acts where its targets exist. |
+| **Postsynaptic response** | A conductance model: fast channels (AMPA, NMDA with Mg²⁺ block, GABA-A) plus slow G-protein signalling (Gs/Gq excitation, Gi→GIRK inhibition). Cross −50 mV and the cell fires. Neuromodulators shift excitability but can't fire it alone. |
+| **Live readouts** | 20-second traces of membrane potential, free transmitter and receptor occupancy, plus clearance counters, vesicle fill, autoreceptor brake and cytosolic store. |
+| **Downstream effects** | An illustrative mood face (from slow signalling and firing) and a heart-rate analogy driven only by noradrenergic tone. Clearly labelled as cartoons, not clinical models. |
 | **Guided tour** | A 10-step walkthrough with camera moves and hands-on tasks; offered automatically on first visit. |
 
 ### Keyboard
@@ -36,7 +36,7 @@ npm run lint    # Biome
 
 ```
 src/
-├── config/     neurotransmitters.js, synapse.js (geometry + physiology constants)
+├── config/     neurotransmitters.js (synapse recipes), receptors.js, drugs.js, synapse.js (constants)
 ├── sim/        synapseModel.js (pure, seedable, frame-rate independent), random.js
 ├── render/     sceneManager.js (renderer, bloom, camera), synapseView.js (anatomy + sync), materials.js
 ├── ui/         hud.js, lineChart.js, moodFace.js, heartMonitor.js, toasts.js, tour.js
@@ -54,6 +54,19 @@ tests/synapseModel.test.js
 
 ## Scientific notes
 
-Timescales are stretched (synaptic events take milliseconds; here they take about a second) and the geometry is not to scale, so the processes stay watchable. Relative behaviour is preserved: amino-acid transmitters are cleared by transporters only, monoamines also by enzymes, ionotropic transmitters drive fast large currents, and metabotropic modulators produce small slow ones. Mood and heart-rate mappings are illustrative.
+Timescales are stretched (synaptic events take milliseconds; here they take about a second) and the geometry is not to scale, so the processes stay watchable. The top bar says so.
+
+**What the model gets right (qualitatively)**
+- Dale's principle: one transmitter per synapse, with ligand-specific receptor subtypes and transporters.
+- Fast ionotropic vs slow metabotropic signalling, including NMDA's Mg²⁺ block and Gi-coupled GIRK inhibition.
+- Probabilistic release, autoreceptor feedback, and a recycling loop: reuptake refills the cytosol, VMAT fills vesicles, and mitochondrial MAO degrades cytosolic monoamines. COMT acts on glia, and only on catecholamines.
+- Amino-acid transmitters are cleared mostly by astrocytes; monoamines by presynaptic transporters, with more diffusion (volume transmission).
+- Drug mechanisms: SSRIs are SERT-selective, cocaine blocks all three monoamine transporters, and amphetamine reverses transporters and empties vesicles (release without spikes). Antipsychotics are competitive and dose-dependent; with haloperidol, chips show both the mass-action occupancy and the live occupancy as dopamine competes. Benzodiazepines only amplify GABA, MAOIs enlarge vesicle stores, and ketamine blocks NMDA.
+
+**What it leaves out**
+- Chronic adaptation (autoreceptor desensitisation, receptor up- or down-regulation, plasticity). This is why SSRIs take weeks, and it isn't modelled.
+- Whole-circuit and whole-body effects. Mood and heart rate are explicit cartoons.
+- Absolute pharmacology. Ki values are relative, and doses are in multiples of each drug's primary Ki, not mg.
+- Dendritic integration: here a single synapse can fire the cell, which real neurons rarely allow.
 
 Earlier design notes and progress reports are kept in [`docs/archive/`](docs/archive/).

@@ -33,8 +33,6 @@ export const RECEPTORS = {
 	captureRadius: 0.32,
 	/** Receptor recovery time after a transmitter leaves (s). */
 	refractory: 0.25,
-	/** Fraction of receptors occupied by the antagonist when enabled. */
-	antagonistFraction: 0.7,
 };
 
 /** Presynaptic autoreceptors ring the active zone. */
@@ -65,6 +63,21 @@ export const ENZYMES = {
 export const ASTROCYTE = {
 	radius: 3.05,
 	arc: Math.PI * 1.0,
+};
+
+/** Kinetics used to turn drug occupancy into behaviour. */
+export const PHARMACOLOGY = {
+	/** Antagonist dissociation rate (1/s); association is set from occupancy. */
+	antagonistKoff: 0.2,
+	/** Efflux through reversed transporters (molecules/s per transporter at full occupancy). */
+	efflux: 2.2,
+	/** Fraction of vesicle content leaking per second at full VMAT disruption. */
+	vmatLeak: 0.6,
+	/** Extra GABA-A conductance and open time at full benzodiazepine occupancy. */
+	pamConductance: 1.5,
+	pamDwell: 1.2,
+	/** How much a transporter substrate competes with normal reuptake. */
+	substrateCompetition: 0.6,
 };
 
 /** Probabilistic vesicle release. */

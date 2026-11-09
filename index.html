@@ -126,33 +126,14 @@
 				<section class="card" data-tour="pharmacology">
 					<header class="card-head">
 						<h2>Pharmacology</h2>
+						<span class="hint" id="drug-count">none active</span>
 					</header>
-					<div class="drug-list">
-						<label class="drug">
-							<input type="checkbox" data-flag="reuptakeBlocked" />
-							<span class="drug-body">
-								<span class="drug-name">Reuptake inhibitor</span>
-								<span class="drug-desc"><span>Blocks transporters, so transmitter lingers. SSRIs, cocaine.</span></span>
-							</span>
-							<span class="switch-track" aria-hidden="true"></span>
-						</label>
-						<label class="drug">
-							<input type="checkbox" data-flag="enzymesBlocked" />
-							<span class="drug-body">
-								<span class="drug-name">Enzyme inhibitor</span>
-								<span class="drug-desc"><span>Stops MAO/COMT breaking down monoamines. MAOIs.</span></span>
-							</span>
-							<span class="switch-track" aria-hidden="true"></span>
-						</label>
-						<label class="drug">
-							<input type="checkbox" data-flag="antagonist" />
-							<span class="drug-body">
-								<span class="drug-name">Receptor antagonist</span>
-								<span class="drug-desc"><span>Occupies ~70% of receptors without activating them. Antipsychotics.</span></span>
-							</span>
-							<span class="switch-track" aria-hidden="true"></span>
-						</label>
-					</div>
+					<p class="caveat">Occupancy = dose ÷ (dose + Ki). A drug only acts where its targets exist at this synapse.</p>
+					<div class="drug-list" id="drug-list"></div>
+					<details class="drug-others" id="drug-others">
+						<summary>Other drugs · little or no action here</summary>
+						<div class="drug-list" id="drug-list-other"></div>
+					</details>
 				</section>
 			</aside>
 

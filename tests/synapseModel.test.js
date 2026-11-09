@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { DRUGS, occupancy } from "../src/config/drugs.js";
 import { nmdaUnblocked } from "../src/config/receptors.js";
 import { MEMBRANE, PARTICLE } from "../src/config/synapse.js";
 import {
@@ -87,7 +88,7 @@ describe("SynapseModel", () => {
 		const measure = (blocked) => {
 			const model = new SynapseModel({ seed: 6 });
 			model.setTransmitter("SEROTONIN");
-			model.setFlag("reuptakeBlocked", blocked);
+			if (blocked) model.setDrug("FLUOXETINE", 20);
 			fire(model, 2, 0.5);
 			run(model, 3);
 			return model.particles.length;
@@ -98,16 +99,23 @@ describe("SynapseModel", () => {
 	it("an antagonist reduces receptor occupancy", () => {
 		const measure = (antagonist) => {
 			const model = new SynapseModel({ seed: 7 });
-			model.setFlag("antagonist", antagonist);
+			model.setTransmitter("DOPAMINE");
+			model.setReleaseProbability(0.8);
+			if (antagonist) {
+				model.setDrug("HALOPERIDOL", 20);
+				run(model, 6);
+			}
 			let bound = 0;
 			fire(model, 3, 0.3);
 			for (let i = 0; i < 60; i++) {
 				model.step(1 / 60);
-				bound += model.boundCount;
+				for (const r of model.receptors) {
+					if (r.type.key === "D2" && r.particle) bound++;
+				}
 			}
 			return bound;
 		};
-		assert.ok(measure(true) < measure(false) * 0.6);
+		assert.ok(measure(true) < measure(false) * 0.4);
 	});
 
 	it("depletes the vesicle pool under rapid firing", () => {
@@ -205,8 +213,8 @@ describe("metabotropic signalling", () => {
 		it(`${key} cannot fire the cell on its own`, () => {
 			const model = new SynapseModel({ seed: 11 });
 			model.setTransmitter(key);
-			model.setFlag("reuptakeBlocked", true);
-			model.setFlag("enzymesBlocked", true);
+			model.setDrug("COCAINE", 20);
+			model.setDrug("PHENELZINE", 20);
 			fire(model, 12, 0.3);
 			assert.equal(model.stats.spikes, 0);
 		});
@@ -266,7 +274,7 @@ describe("presynaptic machinery", () => {
 		const content = (blocked) => {
 			const model = new SynapseModel({ seed: 22 });
 			model.setTransmitter("DOPAMINE");
-			model.setFlag("reuptakeBlocked", blocked);
+			if (blocked) model.setDrug("COCAINE", 20);
 			model.setReleaseProbability(0.6);
 			fire(model, 30, 0.25);
 			run(model, 4);
@@ -283,5 +291,214 @@ describe("presynaptic machinery", () => {
 		for (const t of active) assert.equal(t.side, "pre");
 		model.setTransmitter("GLUTAMATE");
 		assert.ok(model.transporters.some((t) => t.active && t.side === "glia"));
+	});
+});
+
+/** Mean free transmitter over a window, after firing a few spikes. */
+function cleftLoad(model, spikes = 4, window = 4) {
+	fire(model, spikes, 0.4, 0.2);
+	let sum = 0;
+	const steps = Math.round(window * 60);
+	for (let i = 0; i < steps; i++) {
+		model.step(1 / 60);
+		sum += model.freeCount;
+	}
+	return sum / steps;
+}
+
+describe("pharmacology", () => {
+	it("every drug's targets resolve against the receptor and transporter catalogue", () => {
+		const model = new SynapseModel({ seed: 40 });
+		for (const key of Object.keys(DRUGS)) {
+			const targets = model.drugTargets(key);
+			assert.ok(targets.length > 0);
+			for (const t of targets) assert.ok(t.occupancy > 0 && t.occupancy < 1);
+		}
+	});
+
+	it("fluoxetine leaves dopamine clearance unchanged", () => {
+		const model = new SynapseModel({ seed: 41 });
+		model.setTransmitter("DOPAMINE");
+		model.setDrug("FLUOXETINE", 4);
+		// DAT keeps ~99% of its capacity: SERT is the only real target.
+		assert.ok(model._transportFraction() > 0.98);
+
+		// Averaged over seeds, the cleft load matches an untreated synapse.
+		const load = (drug) => {
+			let total = 0;
+			for (let seed = 41; seed < 47; seed++) {
+				const m = new SynapseModel({ seed });
+				m.setTransmitter("DOPAMINE");
+				if (drug) m.setDrug("FLUOXETINE", 4);
+				total += cleftLoad(m);
+			}
+			return total;
+		};
+		const ratio = load(true) / load(false);
+		assert.ok(ratio > 0.85 && ratio < 1.15, `ratio ${ratio}`);
+	});
+
+	it("fluoxetine raises serotonin in the cleft", () => {
+		const control = new SynapseModel({ seed: 42 });
+		control.setTransmitter("SEROTONIN");
+		const treated = new SynapseModel({ seed: 42 });
+		treated.setTransmitter("SEROTONIN");
+		treated.setDrug("FLUOXETINE", 6);
+		assert.ok(cleftLoad(treated) > cleftLoad(control) * 1.3);
+	});
+
+	it("cocaine blocks DAT; methylphenidate spares SERT", () => {
+		const da = (drug) => {
+			const m = new SynapseModel({ seed: 43 });
+			m.setTransmitter("DOPAMINE");
+			if (drug) m.setDrug(drug, 6);
+			return cleftLoad(m);
+		};
+		assert.ok(da("COCAINE") > da(null) * 1.3);
+
+		const model = new SynapseModel({ seed: 44 });
+		model.setTransmitter("SEROTONIN");
+		const [sert] = model
+			.drugTargets("METHYLPHENIDATE", 6)
+			.filter((t) => t.target === "SERT");
+		assert.ok(sert.present && sert.occupancy < 0.02);
+	});
+
+	it("amphetamine releases dopamine with no action potentials", () => {
+		const model = new SynapseModel({ seed: 45 });
+		model.setTransmitter("DOPAMINE");
+		model.setDrug("AMPHETAMINE", 4);
+		const before = model.meanVesicleContent;
+		run(model, 4);
+		assert.equal(model.stats.actionPotentials, 0);
+		assert.ok(model.stats.effluxed > 20, `effluxed ${model.stats.effluxed}`);
+		assert.ok(model.freeCount > 5);
+		assert.ok(model.meanVesicleContent < before, "vesicles empty via VMAT2");
+	});
+
+	it("haloperidol's D2 occupancy matches dose/(dose + Ki)", () => {
+		const dose = 2;
+		const expected = occupancy(dose, 1);
+		const model = new SynapseModel({ seed: 46 });
+		model.setTransmitter("DOPAMINE");
+		model.setDrug("HALOPERIDOL", dose);
+		run(model, 10);
+		let sum = 0;
+		const samples = 3600; // 60 s: slow off-rate needs a long average
+		for (let i = 0; i < samples; i++) {
+			model.step(1 / 60);
+			sum += model.antagonistOccupancy("D2");
+		}
+		const measured = sum / samples;
+		assert.ok(Math.abs(measured - expected) < 0.07, `measured ${measured}`);
+		assert.equal(model.antagonistOccupancy("D1"), 0, "D1 is untouched");
+	});
+
+	it("haloperidol increases release by blocking D2 autoreceptors", () => {
+		const fusions = (drug) => {
+			let total = 0;
+			for (let seed = 50; seed < 56; seed++) {
+				const m = new SynapseModel({ seed });
+				m.setTransmitter("DOPAMINE");
+				if (drug) m.setDrug("HALOPERIDOL", 8);
+				run(m, 5);
+				for (let i = 0; i < 12; i++) {
+					m.injectTransmitter("DOPAMINE", 80);
+					m.fireActionPotential();
+					run(m, 0.5);
+				}
+				total += m.stats.fusions;
+			}
+			return total;
+		};
+		assert.ok(fusions(true) > fusions(false) * 1.15);
+	});
+
+	it("dopamine competes an antagonist off its receptors", () => {
+		const capped = (flood) => {
+			const m = new SynapseModel({ seed: 57 });
+			m.setTransmitter("DOPAMINE");
+			m.setDrug("HALOPERIDOL", 1);
+			run(m, 8);
+			let sum = 0;
+			for (let i = 0; i < 180; i++) {
+				if (flood && i % 15 === 0) m.injectTransmitter("DOPAMINE", 60);
+				m.step(1 / 60);
+				sum += m.antagonistOccupancy("D2");
+			}
+			return sum / 180;
+		};
+		assert.ok(capped(true) < capped(false));
+	});
+
+	it("diazepam does nothing without GABA and deepens inhibition with it", () => {
+		const control = new SynapseModel({ seed: 58 });
+		control.setTransmitter("GABA");
+		const treated = new SynapseModel({ seed: 58 });
+		treated.setTransmitter("GABA");
+		treated.setDrug("DIAZEPAM", 6);
+		run(control, 3);
+		run(treated, 3);
+		assert.equal(treated.voltage, control.voltage, "no GABA, no effect");
+
+		const meanV = (drug) => {
+			let total = 0;
+			for (let seed = 60; seed < 64; seed++) {
+				const m = new SynapseModel({ seed });
+				m.setTransmitter("GABA");
+				if (drug) m.setDrug("DIAZEPAM", 6);
+				fire(m, 3, 0.4, 0.2);
+				for (let i = 0; i < 120; i++) {
+					m.step(1 / 60);
+					total += m.voltage;
+				}
+			}
+			return total / (4 * 120);
+		};
+		assert.ok(meanV(true) < meanV(false) - 0.5);
+	});
+
+	it("phenelzine fills vesicles fuller rather than prolonging the cleft signal", () => {
+		const measure = (drug) => {
+			const m = new SynapseModel({ seed: 65 });
+			m.setTransmitter("SEROTONIN");
+			if (drug) m.setDrug("PHENELZINE", 10);
+			m.setReleaseProbability(0.9);
+			run(m, 8);
+			fire(m, 6, 0.6);
+			run(m, 6);
+			return { fill: m.meanVesicleContent, cytosol: m.cytosol };
+		};
+		const control = measure(false);
+		const treated = measure(true);
+		assert.ok(treated.cytosol > control.cytosol * 1.2);
+		assert.ok(treated.fill > control.fill * 1.2);
+
+		// Clearance from the cleft itself is unchanged: fluoxetine-style
+		// lingering does not happen with an MAOI alone.
+		const persistence = (drug) => {
+			const m = new SynapseModel({ seed: 66 });
+			m.setTransmitter("SEROTONIN");
+			if (drug) m.setDrug("PHENELZINE", 10);
+			m.injectTransmitter("SEROTONIN", 80);
+			run(m, 1.5);
+			return m.freeCount;
+		};
+		const ratio = persistence(true) / persistence(false);
+		assert.ok(ratio > 0.8 && ratio < 1.25, `ratio ${ratio}`);
+	});
+
+	it("ketamine suppresses NMDA-driven firing at a glutamate synapse", () => {
+		const spikes = (drug) => {
+			let total = 0;
+			for (let seed = 70; seed < 74; seed++) {
+				const m = new SynapseModel({ seed });
+				if (drug) m.setDrug("KETAMINE", 10);
+				fire(m, 5, 0.4);
+				total += m.stats.spikes;
+			}
+			return total;
+		};
+		assert.ok(spikes(true) < spikes(false));
 	});
 });

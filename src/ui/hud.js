@@ -1,3 +1,10 @@
+import {
+	ACTION_LABELS,
+	DOSE_RANGE,
+	DRUG_ORDER,
+	DRUGS,
+	TARGET_NAMES,
+} from "../config/drugs.js";
 import { NEUROTRANSMITTERS, NT_ORDER } from "../config/neurotransmitters.js";
 import { isExcitatory, RECEPTOR_TYPES } from "../config/receptors.js";
 import { MEMBRANE, PARTICLE } from "../config/synapse.js";
@@ -115,6 +122,7 @@ export class Hud {
 		$("#nt-info .nt-more").addEventListener("toggle", (e) => {
 			this._factsOpen = e.target.open;
 		});
+		if (this.drugCards) this._renderDrugs();
 		this.bus.emit("ui:transmitter", key);
 	}
 
@@ -177,33 +185,112 @@ export class Hud {
 	// ---------------------------------------------------------------------
 
 	_bindPharmacology() {
-		this.drugInputs = [...document.querySelectorAll("[data-flag]")];
-		for (const input of this.drugInputs) {
-			input.addEventListener("change", () => {
-				const flag = input.dataset.flag;
-				this.model.setFlag(flag, input.checked);
-				if (input.checked) this._explainDrug(flag);
-			});
-		}
+		this.drugDoses = Object.fromEntries(
+			DRUG_ORDER.map((key) => [key, DRUGS[key].defaultDose]),
+		);
+		this.drugCards = {};
+		for (const key of DRUG_ORDER)
+			this.drugCards[key] = this._buildDrugCard(key);
+		this.bus.on("drug:changed", () => this._renderDrugs());
 	}
 
-	_explainDrug(flag) {
-		const nt = NEUROTRANSMITTERS[this.model.settings.transmitter];
-		const messages = {
-			reuptakeBlocked:
-				"Transporters blocked: transmitter now lingers in the cleft.",
-			enzymesBlocked:
-				nt.enzymatic > 0
-					? `MAO/COMT blocked: ${nt.name} is no longer broken down.`
-					: `${nt.name} isn't broken down by MAO/COMT, so this barely matters. Try a monoamine.`,
-			antagonist:
-				"Antagonist bound: ~70% of receptors are capped and can't respond.",
-		};
-		this.toaster.show(messages[flag], {
-			color: "#ff5c7a",
-			key: flag,
-			throttle: 0,
+	_buildDrugCard(key) {
+		const drug = DRUGS[key];
+		const card = document.createElement("div");
+		card.className = "drug-card";
+		card.dataset.drug = key;
+		card.innerHTML = `
+			<label class="drug">
+				<input type="checkbox" />
+				<span class="drug-body">
+					<span class="drug-name">${drug.name}${drug.brand ? ` <span class="drug-brand">${drug.brand}</span>` : ""}</span>
+					<span class="drug-class">${drug.drugClass}</span>
+				</span>
+				<span class="switch-track" aria-hidden="true"></span>
+			</label>
+			<div class="drug-detail" hidden>
+				<div class="drug-targets"></div>
+				<div class="slider-row">
+					<span class="field-label">Dose</span>
+					<input type="range" min="${DOSE_RANGE.min}" max="${DOSE_RANGE.max}" step="${DOSE_RANGE.step}" value="${drug.defaultDose}" aria-label="${drug.name} dose" />
+					<output class="mono"></output>
+				</div>
+				<p class="drug-mech">${drug.mechanism}</p>
+				<p class="drug-watch"><strong>Watch:</strong> ${drug.watch}</p>
+				${drug.caveat ? `<p class="drug-caveat">${drug.caveat}</p>` : ""}
+			</div>`;
+
+		const toggle = card.querySelector("input[type=checkbox]");
+		const slider = card.querySelector("input[type=range]");
+		toggle.addEventListener("change", () => {
+			this.model.setDrug(key, toggle.checked ? this.drugDoses[key] : 0);
+			if (toggle.checked) this._explainDrug(key);
 		});
+		slider.addEventListener("input", () => {
+			this.drugDoses[key] = Number(slider.value);
+			if (toggle.checked) this.model.setDrug(key, this.drugDoses[key]);
+			else this._renderDrugs();
+		});
+		return { card, toggle, slider, detail: card.querySelector(".drug-detail") };
+	}
+
+	/** Sort cards by relevance to this synapse and refresh their target chips. */
+	_renderDrugs() {
+		const relevantList = $("#drug-list");
+		const otherList = $("#drug-list-other");
+		let active = 0;
+		for (const key of DRUG_ORDER) {
+			const { card, toggle, slider, detail } = this.drugCards[key];
+			const dose = this.drugDoses[key];
+			const on = key in this.model.drugs;
+			if (on) active++;
+			toggle.checked = on;
+			detail.hidden = !on;
+			card.classList.toggle("is-active", on);
+			slider.value = String(dose);
+			setFill(slider);
+			setText(card.querySelector("output"), `${dose}× Ki`);
+
+			const targets = this.model.drugTargets(key, dose);
+			const relevant = actsHere(targets);
+			card.querySelector(".drug-targets").innerHTML = targets
+				.map((t) => {
+					const name = TARGET_NAMES[t.target] ?? RECEPTOR_TYPES[t.target].name;
+					return t.present
+						? `<span class="target-chip">${name} ${ACTION_LABELS[t.action]} · ${Math.round(t.occupancy * 100)}%${
+								t.action === "antagonist" && on
+									? ` <span class="live" data-live="${t.target}" title="Receptors actually capped right now. Released transmitter competes the drug off.">live –</span>`
+									: ""
+							}</span>`
+						: `<span class="target-chip is-absent" title="Not present at this synapse">${name} · not here</span>`;
+				})
+				.join("");
+			const list = relevant ? relevantList : otherList;
+			if (card.parentElement !== list) list.appendChild(card);
+		}
+		// Keep catalogue order within each list.
+		for (const list of [relevantList, otherList]) {
+			for (const key of DRUG_ORDER) {
+				const { card } = this.drugCards[key];
+				if (card.parentElement === list) list.appendChild(card);
+			}
+		}
+		$("#drug-others").hidden = otherList.childElementCount === 0;
+		setText(
+			$("#drug-count"),
+			active === 0 ? "none active" : `${active} active`,
+		);
+	}
+
+	_explainDrug(key) {
+		const drug = DRUGS[key];
+		const nt = this.model.transmitter;
+		const relevant = actsHere(this.model.drugTargets(key, this.drugDoses[key]));
+		if (relevant) return;
+		this.toaster.show(
+			`${drug.name} has no meaningful target at a ${nt.synapse.toLowerCase()} synapse, so it does (almost) nothing here.`,
+			{ color: "#9a8bff", key: `drug-${key}`, throttle: 0 },
+		);
 	}
 
 	// ---------------------------------------------------------------------
@@ -524,6 +611,16 @@ export class Hud {
 		const wanted = Math.min(PARTICLE.maxCount, Math.max(40, peak * 1.15));
 		this._freeMax += (wanted - this._freeMax) * 0.05;
 
+		// Live antagonist occupancy (competition with released transmitter).
+		const now = performance.now();
+		if (now - (this._lastLive ?? 0) > 250) {
+			this._lastLive = now;
+			for (const el of document.querySelectorAll("[data-live]")) {
+				const occ = m.antagonistOccupancy(el.dataset.live);
+				setText(el, `live ${Math.round(occ * 100)}%`);
+			}
+		}
+
 		this.voltageChart.draw();
 		this.cleftChart.draw();
 	}
@@ -556,4 +653,12 @@ function setFill(input) {
 function formatSigned(v) {
 	const s = Math.abs(v).toFixed(1);
 	return v < 0 ? `−${s}` : `+${s}`;
+}
+
+/**
+ * A drug acts at this synapse when one of its targets is present and the
+ * dose occupies a meaningful share of it (at least 5%).
+ */
+function actsHere(targets) {
+	return targets.some((t) => t.present && t.occupancy >= 0.05);
 }

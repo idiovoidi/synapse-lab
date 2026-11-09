@@ -900,26 +900,102 @@ input:focus-visible ~ .switch-track {
 	font-weight: 600;
 }
 
-.drug-desc {
+.drug-class {
 	font-size: 11.5px;
 	color: var(--muted);
-	display: grid;
-	grid-template-rows: 0fr;
-	opacity: 0;
-	transition:
-		grid-template-rows 0.3s var(--ease),
-		opacity 0.3s;
 }
 
-.drug-desc > span {
-	overflow: hidden;
+.drug-brand {
+	font-weight: 400;
+	font-size: 11.5px;
+	color: var(--muted);
 }
 
-.drug:hover .drug-desc,
-.drug:focus-within .drug-desc,
-.drug:has(input:checked) .drug-desc {
-	grid-template-rows: 1fr;
-	opacity: 1;
+.drug-card {
+	border-radius: var(--radius-md);
+}
+
+.drug-card.is-active {
+	background: rgba(255, 92, 122, 0.05);
+	border: 1px solid rgba(255, 92, 122, 0.3);
+}
+
+.drug-card.is-active > .drug {
+	border-color: transparent;
+	background: none;
+}
+
+.drug-detail {
+	padding: 0 11px 11px;
+	font-size: 12px;
+	color: var(--text-dim);
+}
+
+.drug-detail p {
+	margin-top: 6px;
+}
+
+.drug-detail .slider-row .field-label {
+	min-width: 32px;
+}
+
+.drug-watch strong {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.drug-caveat {
+	font-size: 11px;
+	color: var(--muted);
+	font-style: italic;
+}
+
+.drug-targets {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.target-chip {
+	font-family: var(--mono);
+	font-size: 10.5px;
+	padding: 2px 7px;
+	border-radius: 999px;
+	color: #ffb0bf;
+	background: rgba(255, 92, 122, 0.12);
+	border: 1px solid rgba(255, 92, 122, 0.35);
+}
+
+.target-chip .live {
+	color: var(--text);
+	opacity: 0.85;
+}
+
+.target-chip.is-absent {
+	color: var(--muted);
+	background: none;
+	border-color: var(--line);
+	text-decoration: line-through;
+	text-decoration-color: rgba(124, 132, 166, 0.5);
+}
+
+.drug-others {
+	margin-top: 8px;
+	font-size: 12px;
+}
+
+.drug-others[hidden] {
+	display: none;
+}
+
+.drug-others summary {
+	cursor: pointer;
+	color: var(--muted);
+	padding: 4px 2px 8px;
+}
+
+.drug-others summary:hover {
+	color: var(--text-dim);
 }
 
 .drug .switch-track {
