@@ -605,6 +605,56 @@ describe("sustained firing", () => {
 			m.setDrug("FLUOXETINE", 4);
 			treated += meanFree(m, 20);
 		}
-		assert.ok(treated > baseline * 1.1, `baseline ${baseline}, treated ${treated}`);
+		assert.ok(
+			treated > baseline * 1.1,
+			`baseline ${baseline}, treated ${treated}`,
+		);
+	});
+});
+
+describe("amphetamine family", () => {
+	it("dexamphetamine releases dopamine without spikes, weighted to DAT", () => {
+		const m = new SynapseModel({ seed: 100 });
+		m.setTransmitter("DOPAMINE");
+		m.setDrug("DEXAMPHETAMINE", 3);
+		run(m, 4);
+		assert.equal(m.stats.actionPotentials, 0);
+		assert.ok(m.stats.effluxed > 20);
+
+		const dat = (key) =>
+			m.drugTargets(key, 3).find((t) => t.target === "DAT").occupancy;
+		assert.ok(dat("DEXAMPHETAMINE") > dat("AMPHETAMINE"));
+	});
+
+	it("lisdexamfetamine converts gradually to dexamphetamine", () => {
+		const lis = new SynapseModel({ seed: 101 });
+		lis.setTransmitter("DOPAMINE");
+		lis.setDrug("LISDEXAMFETAMINE", 3);
+		const dex = new SynapseModel({ seed: 101 });
+		dex.setTransmitter("DOPAMINE");
+		dex.setDrug("DEXAMPHETAMINE", 3);
+
+		assert.equal(lis.prodrugConversion("LISDEXAMFETAMINE"), 0);
+		run(lis, 2);
+		run(dex, 2);
+		assert.ok(lis.stats.effluxed < dex.stats.effluxed * 0.5, "slow onset");
+		assert.ok(lis.transporterReversal < dex.transporterReversal);
+
+		run(lis, 48);
+		assert.ok(lis.prodrugConversion("LISDEXAMFETAMINE") > 0.99);
+		assert.ok(
+			Math.abs(lis.transporterReversal - dex.transporterReversal) < 0.01,
+		);
+	});
+
+	it("changing the dose keeps conversion progress; reset restarts it", () => {
+		const m = new SynapseModel({ seed: 102 });
+		m.setDrug("LISDEXAMFETAMINE", 3);
+		run(m, 10);
+		const before = m.prodrugConversion("LISDEXAMFETAMINE");
+		m.setDrug("LISDEXAMFETAMINE", 6);
+		assert.equal(m.prodrugConversion("LISDEXAMFETAMINE"), before);
+		m.reset();
+		assert.equal(m.prodrugConversion("LISDEXAMFETAMINE"), 0);
 	});
 });

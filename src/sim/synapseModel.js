@@ -57,6 +57,9 @@ export class SynapseModel {
 
 		/** Active drugs: key → relative dose. */
 		this.drugs = {};
+		/** Simulation time each drug was started (drives prodrug conversion). */
+		this._drugStart = {};
+		this._prodrugClock = 0;
 		this._recomputeDrugEffects();
 
 		this.receptors = this._createReceptors();
@@ -76,6 +79,8 @@ export class SynapseModel {
 
 	reset() {
 		this.time = 0;
+		// Prodrugs restart their conversion along with the clock.
+		for (const key of Object.keys(this.drugs)) this._drugStart[key] = 0;
 		this.particles = [];
 		this.actionPotentials = [];
 		this.calciumPulses = [];
@@ -177,8 +182,14 @@ export class SynapseModel {
 	 */
 	setDrug(key, dose) {
 		if (!DRUGS[key]) return;
-		if (dose > 0) this.drugs[key] = dose;
-		else delete this.drugs[key];
+		if (dose > 0) {
+			// Changing the dose of a running drug keeps its conversion progress.
+			if (!(key in this.drugs)) this._drugStart[key] = this.time ?? 0;
+			this.drugs[key] = dose;
+		} else {
+			delete this.drugs[key];
+			delete this._drugStart[key];
+		}
 		this._recomputeDrugEffects();
 		this.emit("drug:changed", { key, dose: this.drugs[key] ?? 0 });
 	}
@@ -213,6 +224,26 @@ export class SynapseModel {
 			}
 			return { ...t, occupancy: occupancy(dose, t.ki), present };
 		});
+	}
+
+	/**
+	 * Fraction of a prodrug converted to its active moiety (1 for ordinary
+	 * drugs, and for drugs that are not active).
+	 * @param {string} key
+	 */
+	prodrugConversion(key) {
+		const prodrug = DRUGS[key]?.prodrug;
+		if (!prodrug || !(key in this.drugs)) return 1;
+		const elapsed = Math.max(0, (this.time ?? 0) - (this._drugStart[key] ?? 0));
+		return 1 - Math.exp(-elapsed / prodrug.conversionTau);
+	}
+
+	/**
+	 * Active drug level: the dose, scaled by conversion for prodrugs.
+	 * @param {string} key
+	 */
+	drugLevel(key) {
+		return (this.drugs[key] ?? 0) * this.prodrugConversion(key);
 	}
 
 	/** Fraction of D2-type (or any) receptors currently capped by an antagonist. */
@@ -329,6 +360,17 @@ export class SynapseModel {
 		);
 	}
 
+	/** Re-derive drug effects while any prodrug is still converting. */
+	_updateProdrugs(h) {
+		this._prodrugClock += h;
+		if (this._prodrugClock < 0.1) return;
+		this._prodrugClock = 0;
+		const converting = Object.keys(this.drugs).some(
+			(key) => DRUGS[key].prodrug && this.prodrugConversion(key) < 0.999,
+		);
+		if (converting) this._recomputeDrugEffects();
+	}
+
 	/** Fraction of normal reuptake capacity left after drugs (0–1). */
 	get reuptakeCapacity() {
 		return this._transportFraction();
@@ -358,10 +400,12 @@ export class SynapseModel {
 	_recomputeDrugEffects() {
 		const ratios = {};
 		const firstDrug = {};
-		for (const [key, dose] of Object.entries(this.drugs)) {
+		for (const key of Object.keys(this.drugs)) {
+			const level = this.drugLevel(key);
+			if (level <= 0) continue;
 			for (const t of DRUGS[key].targets) {
 				const id = `${t.action}:${t.target}`;
-				ratios[id] = (ratios[id] || 0) + dose / t.ki;
+				ratios[id] = (ratios[id] || 0) + level / t.ki;
 				firstDrug[id] ??= key;
 			}
 		}
@@ -730,6 +774,7 @@ export class SynapseModel {
 	_tick(h) {
 		this.time += h;
 		this._runScheduled();
+		this._updateProdrugs(h);
 		this._updateAutoFire(h);
 		this._updateCytosol(h);
 		this._updateVesicles(h);

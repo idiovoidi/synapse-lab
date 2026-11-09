@@ -255,6 +255,14 @@ export class Hud {
 				</div>
 				<p class="drug-mech">${drug.mechanism}</p>
 				<p class="drug-watch"><strong>Watch:</strong> ${drug.watch}</p>
+				${
+					drug.prodrug
+						? `<div class="drug-conversion" title="Target occupancy above is shown at full conversion">
+					<span data-conversion="${key}">Converted to ${DRUGS[drug.prodrug.activeMoiety].name.toLowerCase()}: –</span>
+					<div class="meter"><div class="meter-fill" data-conversion-meter="${key}"></div></div>
+				</div>`
+						: ""
+				}
 				${drug.caveat ? `<p class="drug-caveat">${drug.caveat}</p>` : ""}
 			</div>`;
 
@@ -708,9 +716,10 @@ export class Hud {
 		const el = $("#sr-status");
 		if (!el) return;
 		el.textContent = "";
-		requestAnimationFrame(() => {
+		// Clear then set on a later tick so repeated messages are re-announced.
+		setTimeout(() => {
 			el.textContent = message;
-		});
+		}, 50);
 	}
 
 	_updateCompare() {
@@ -797,6 +806,18 @@ export class Hud {
 			for (const el of document.querySelectorAll("[data-live]")) {
 				const occ = m.antagonistOccupancy(el.dataset.live);
 				setText(el, `live ${Math.round(occ * 100)}%`);
+			}
+			// Prodrug conversion progress (e.g. lisdexamfetamine → dexamphetamine).
+			for (const el of document.querySelectorAll("[data-conversion]")) {
+				const key = el.dataset.conversion;
+				const conv = m.prodrugConversion(key);
+				const active =
+					DRUGS[DRUGS[key].prodrug.activeMoiety].name.toLowerCase();
+				setText(el, `Converted to ${active}: ${Math.round(conv * 100)}%`);
+				const meter = document.querySelector(
+					`[data-conversion-meter="${key}"]`,
+				);
+				if (meter) meter.style.width = `${conv * 100}%`;
 			}
 		}
 

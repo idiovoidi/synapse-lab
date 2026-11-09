@@ -44,6 +44,10 @@
  * @property {string} mechanism
  * @property {string} watch     What to look for in the simulation.
  * @property {string} [caveat]  What the simulation leaves out.
+ * @property {{activeMoiety: string, conversionTau: number}} [prodrug]
+ *   Inactive until converted. `targets` are those of the active moiety, and
+ *   the active level rises as 1 − exp(−t / conversionTau) after the drug
+ *   is started (simulation seconds).
  */
 
 /** @type {Record<string, Drug>} */
@@ -116,7 +120,7 @@ export const DRUGS = {
 		key: "AMPHETAMINE",
 		name: "Amphetamine",
 		brand: "Adderall",
-		drugClass: "Stimulant · releaser",
+		drugClass: "Stimulant · releaser (d/l mixed salts)",
 		targets: [
 			{ target: "DAT", action: "transporterReverse", ki: 1 },
 			{ target: "NET", action: "transporterReverse", ki: 0.6 },
@@ -127,6 +131,41 @@ export const DRUGS = {
 			"Enters through DAT/NET, empties vesicles into the cytosol via VMAT2, then drives the transporters backwards.",
 		watch:
 			"Dopamine pours out of the transporters with no action potentials at all, and vesicles shrink.",
+	},
+	DEXAMPHETAMINE: {
+		key: "DEXAMPHETAMINE",
+		name: "Dexamphetamine",
+		brand: "Dexedrine",
+		drugClass: "Stimulant · releaser (d-isomer)",
+		targets: [
+			{ target: "DAT", action: "transporterReverse", ki: 0.75 },
+			{ target: "NET", action: "transporterReverse", ki: 0.6 },
+			{ target: "VMAT", action: "vmatDisrupt", ki: 2 },
+		],
+		defaultDose: 3,
+		mechanism:
+			"The d-isomer of amphetamine. It reverses DAT and NET and empties vesicles via VMAT2, with stronger dopamine action than the d/l mixture.",
+		watch:
+			"Like amphetamine but more dopamine efflux at the same dose. Release starts at once, with no spikes needed.",
+	},
+	LISDEXAMFETAMINE: {
+		key: "LISDEXAMFETAMINE",
+		name: "Lisdexamfetamine",
+		brand: "Vyvanse",
+		drugClass: "Stimulant · prodrug of dexamphetamine",
+		prodrug: { activeMoiety: "DEXAMPHETAMINE", conversionTau: 10 },
+		targets: [
+			{ target: "DAT", action: "transporterReverse", ki: 0.75 },
+			{ target: "NET", action: "transporterReverse", ki: 0.6 },
+			{ target: "VMAT", action: "vmatDisrupt", ki: 2 },
+		],
+		defaultDose: 3,
+		mechanism:
+			"Inactive on its own: d-amphetamine bound to lysine. Enzymes in red blood cells cleave it gradually, so active drug builds up slowly and evenly.",
+		watch:
+			"At a dopamine synapse, efflux starts as a trickle and builds over about 10 s (standing in for roughly an hour), unlike dexamphetamine's immediate hit.",
+		caveat:
+			"The slow, rate-limited conversion is why it is harder to misuse (snorting or injecting doesn't speed it up). There's no elimination here, so once converted the level stays steady.",
 	},
 	HALOPERIDOL: {
 		key: "HALOPERIDOL",
@@ -200,6 +239,8 @@ export const DRUG_ORDER = [
 	"COCAINE",
 	"METHYLPHENIDATE",
 	"AMPHETAMINE",
+	"DEXAMPHETAMINE",
+	"LISDEXAMFETAMINE",
 	"HALOPERIDOL",
 	"RISPERIDONE",
 	"DIAZEPAM",
