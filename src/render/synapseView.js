@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { NEUROTRANSMITTERS } from "../config/neurotransmitters.js";
+import { isExcitatory } from "../config/receptors.js";
 import {
 	ACTION_POTENTIAL,
 	CLEFT,
@@ -267,38 +268,63 @@ export class SynapseView {
 	}
 
 	_buildReceptors() {
-		const stemGeo = new THREE.CylinderGeometry(0.075, 0.09, 0.42, 10);
-		stemGeo.rotateZ(Math.PI / 2);
-		const cupGeo = new THREE.TorusGeometry(0.115, 0.04, 10, 20);
-		cupGeo.rotateY(Math.PI / 2);
-		const capGeo = new THREE.SphereGeometry(0.1, 14, 10);
+		this.receptorViews = this.model.receptors.map((r) =>
+			this._makeReceptorView(r, -1, 1),
+		);
+	}
 
-		this.receptorViews = this.model.receptors.map((r) => {
-			const material = new THREE.MeshStandardMaterial({
-				color: PALETTE.receptorIdle,
-				emissive: "#000000",
-				roughness: 0.35,
-				metalness: 0.4,
-			});
-			const group = new THREE.Group();
-			const stem = new THREE.Mesh(stemGeo, material);
-			stem.position.x = 0.04;
-			const cup = new THREE.Mesh(cupGeo, material);
-			cup.position.x = -0.2;
-			const cap = new THREE.Mesh(
-				capGeo,
-				new THREE.MeshStandardMaterial({
-					color: PALETTE.blocked,
-					roughness: 0.9,
-				}),
-			);
-			cap.position.x = -0.24;
-			cap.visible = false;
-			group.add(stem, cup, cap);
-			group.position.set(r.x, r.y, r.z);
-			this.root.add(group);
-			return { model: r, material, cap };
+	/**
+	 * Receptor mesh: a stem through the membrane plus either a ring-shaped
+	 * channel pore (ionotropic) or a seven-sided GPCR bundle (metabotropic),
+	 * so the two kinds differ in shape, not only colour.
+	 * @param {object} r Model receptor.
+	 * @param {1 | -1} facing Direction of the cleft along X.
+	 * @param {number} scale
+	 */
+	_makeReceptorView(r, facing, scale) {
+		if (!this._receptorGeo) {
+			const stem = new THREE.CylinderGeometry(0.075, 0.09, 0.42, 10);
+			stem.rotateZ(Math.PI / 2);
+			const pore = new THREE.TorusGeometry(0.115, 0.04, 10, 20);
+			pore.rotateY(Math.PI / 2);
+			const gpcr = new THREE.CylinderGeometry(0.12, 0.13, 0.17, 7);
+			gpcr.rotateZ(Math.PI / 2);
+			this._receptorGeo = {
+				stem,
+				pore,
+				gpcr,
+				cap: new THREE.SphereGeometry(0.1, 14, 10),
+			};
+		}
+		const geo = this._receptorGeo;
+		const material = new THREE.MeshStandardMaterial({
+			color: PALETTE.receptorIdle,
+			emissive: "#000000",
+			roughness: 0.35,
+			metalness: 0.4,
+			flatShading: false,
 		});
+		const group = new THREE.Group();
+		const stem = new THREE.Mesh(geo.stem, material);
+		stem.position.x = -0.04 * facing;
+		const pore = new THREE.Mesh(geo.pore, material);
+		pore.position.x = 0.2 * facing;
+		const gpcr = new THREE.Mesh(geo.gpcr, material);
+		gpcr.position.x = 0.17 * facing;
+		const cap = new THREE.Mesh(
+			geo.cap,
+			new THREE.MeshStandardMaterial({
+				color: PALETTE.blocked,
+				roughness: 0.9,
+			}),
+		);
+		cap.position.x = 0.24 * facing;
+		cap.visible = false;
+		group.add(stem, pore, gpcr, cap);
+		group.position.set(r.x, r.y, r.z);
+		group.scale.setScalar(scale);
+		this.root.add(group);
+		return { model: r, material, cap, pore, gpcr, typeKey: null };
 	}
 
 	_buildTransporters() {
@@ -689,20 +715,24 @@ export class SynapseView {
 	}
 
 	_syncReceptors() {
-		const exc = new THREE.Color(PALETTE.excitatory);
-		const inh = new THREE.Color(PALETTE.inhibitory);
-		for (const view of this.receptorViews) {
-			const r = view.model;
-			view.cap.visible = r.blocked;
-			const type = r.particle?.type ?? r.lastType;
-			const target =
-				type && NEUROTRANSMITTERS[type].polarity === "inhibitory" ? inh : exc;
-			view.material.color
-				.set(r.blocked ? "#4b4560" : PALETTE.receptorIdle)
-				.lerp(target, r.activation * 0.85);
-			view.material.emissive.copy(target);
-			view.material.emissiveIntensity = r.activation * 0.75;
+		for (const view of this.receptorViews) this._syncReceptorView(view);
+	}
+
+	_syncReceptorView(view) {
+		const r = view.model;
+		if (view.typeKey !== r.type.key) {
+			view.typeKey = r.type.key;
+			const gpcr = r.type.kind === "metabotropic";
+			view.gpcr.visible = gpcr;
+			view.pore.visible = !gpcr;
 		}
+		view.cap.visible = r.blocked;
+		const target = isExcitatory(r.type) ? EXCITATORY : INHIBITORY;
+		view.material.color
+			.set(r.blocked ? "#4b4560" : PALETTE.receptorIdle)
+			.lerp(target, r.activation * 0.85);
+		view.material.emissive.copy(target);
+		view.material.emissiveIntensity = r.activation * 0.75;
 	}
 
 	_syncTransporters() {
@@ -787,6 +817,8 @@ export class SynapseView {
 }
 
 const GREY = new THREE.Color("#3a3a46");
+const EXCITATORY = new THREE.Color(PALETTE.excitatory);
+const INHIBITORY = new THREE.Color(PALETTE.inhibitory);
 
 function easeOutBack(t) {
 	const c1 = 1.70158;

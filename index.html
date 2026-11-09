@@ -50,6 +50,7 @@
 				<div class="topbar-status">
 					<span class="chip" id="status-chip"><span class="dot"></span><span id="status-text">Running</span></span>
 					<span class="chip chip-mono" id="clock-chip">t 0.0 s</span>
+					<span class="chip" title="Synaptic events really take milliseconds and the cleft is about 20 nm wide. Both are stretched here so you can watch them.">1 s here ≈ 1 ms real · not to scale</span>
 				</div>
 
 				<div class="topbar-actions">
@@ -176,7 +177,13 @@
 					</dl>
 				</section>
 
-				<section class="card card-body-split" data-tour="body">
+				<section class="card card-body" data-tour="body">
+					<header class="card-head">
+						<h2>Downstream effects</h2>
+						<span class="badge badge-muted">Illustrative</span>
+					</header>
+					<p class="caveat">A teaching analogy, not a clinical model. Real mood emerges from whole circuits over days to weeks, and heart rate is set by peripheral nerves.</p>
+					<div class="card-body-split">
 					<div class="split-col">
 						<header class="card-head"><h2>Mood</h2></header>
 						<div class="mood">
@@ -185,7 +192,7 @@
 						</div>
 					</div>
 					<div class="split-col">
-						<header class="card-head"><h2>Heart</h2></header>
+						<header class="card-head"><h2>Heart</h2><span class="hint" title="Only noradrenergic tone moves it, like sympathetic nerves to the heart">NE analogy</span></header>
 						<div class="heart">
 							<div class="heart-readout">
 								<svg class="heart-icon" id="heart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.6 1.2 4.4 2.4h1.8c.8-1.2 2.2-2.4 4.4-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>
@@ -195,6 +202,7 @@
 							<canvas class="ecg" id="ecg"></canvas>
 							<span class="heart-status" id="heart-status">Normal sinus rhythm</span>
 						</div>
+					</div>
 					</div>
 				</section>
 			</aside>

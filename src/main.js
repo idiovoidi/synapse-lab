@@ -60,7 +60,7 @@ function boot() {
 		view.update(simDt);
 		hud.update();
 
-		face.setTarget(computeMood(model.tone));
+		face.setTarget(computeMood(model.tone, model.firingRate));
 		face.update(dt);
 		heart.setTarget(computeHeartRate(model.tone));
 		heart.update(hud.state.paused ? 0 : dt);

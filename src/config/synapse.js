@@ -73,12 +73,28 @@ export const MEMBRANE = {
 	reset: -75,
 	/** Membrane time constant (s). */
 	tau: 0.22,
-	/** Conductance per bound receptor at efficacy 1. */
+	/** Conductance per bound ionotropic receptor at gain 1. */
 	conductance: 0.3,
 	excitatoryReversal: 0,
 	inhibitoryReversal: -80,
+	/** GIRK K⁺ channels opened by Gi-coupled receptors. */
+	potassiumReversal: -90,
 	refractory: 0.18,
 };
+
+/**
+ * Second-messenger pools driven by GPCRs. Each pool rises and falls slowly,
+ * so metabotropic effects lag binding, as real G-protein cascades do.
+ */
+export const MESSENGER = {
+	rise: 0.5,
+	decay: 2,
+	/** Conductance per unit of messenger (one fully bound receptor). */
+	conductance: 0.05,
+};
+
+/** Smoothing time constant for the postsynaptic firing-rate estimate (s). */
+export const FIRING_RATE_TAU = 3;
 
 export const TONE = {
 	/** Time constant of the slow per-transmitter "tone" integrator (s). */

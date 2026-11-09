@@ -1,33 +1,32 @@
 /**
- * Neurotransmitter catalogue.
+ * Neurotransmitter catalogue and the synapse "recipe" for each one.
  *
- * Kinetic values are in simulation units (seconds, scene units) and are tuned
- * so that effects are visible at human timescales. Real synaptic events happen
- * in milliseconds; relative differences between transmitters are what matter.
+ * Following Dale's principle, choosing a transmitter chooses a synapse type:
+ * the presynaptic neuron releases that transmitter, and the postsynaptic
+ * membrane carries the receptor subtypes that recognise it.
+ *
+ * Kinetic values are in simulation units (seconds, scene units), stretched so
+ * effects are visible at human timescales. Real synaptic events take
+ * milliseconds; the relative differences are what matter.
  */
-
-/** @typedef {"excitatory" | "inhibitory"} Polarity */
 
 /**
  * @typedef {object} Neurotransmitter
  * @property {string} key
  * @property {string} name
- * @property {string} short       Three-letter label used in compact UI.
+ * @property {string} short       Compact label.
  * @property {string} color       CSS hex colour used in the scene and HUD.
- * @property {Polarity} polarity
- * @property {"ionotropic" | "metabotropic"} action
+ * @property {string} synapse     Name of the synapse type.
  * @property {string} role
  * @property {string} summary
- * @property {string} receptors
+ * @property {Array<[string, number]>} postsynaptic  Receptor subtype mix (fractions sum to 1).
+ * @property {string} transporter Plasma-membrane transporter that clears it.
  * @property {string} clearance
  * @property {number} diffusion   Relative diffusion coefficient.
- * @property {number} affinity    Probability of binding per receptor contact.
- * @property {number} dwell       Mean time bound to a receptor (s).
  * @property {number} reuptake    Transporter capture rate (1/s near a transporter).
- * @property {number} enzymatic   Enzyme degradation rate (1/s near an enzyme); 0 = immune.
- * @property {number} efficacy    Postsynaptic conductance per bound receptor (relative).
+ * @property {number} enzymatic   Extracellular enzyme rate (1/s near an enzyme); 0 = none.
  * @property {{happiness:number, arousal:number, anxiety:number}} mood
- * @property {number} heart       Heart-rate change (BPM) at full tone.
+ *   Illustrative contribution to the mood display (not a clinical model).
  */
 
 /** @type {Record<string, Neurotransmitter>} */
@@ -37,105 +36,98 @@ export const NEUROTRANSMITTERS = {
 		name: "Glutamate",
 		short: "Glu",
 		color: "#5b8cff",
-		polarity: "excitatory",
-		action: "ionotropic",
+		synapse: "Glutamatergic",
 		role: "Primary excitatory signal",
 		summary:
-			"The brain's main 'go' signal. Opens AMPA/NMDA channels, letting Na⁺ rush in and depolarise the cell. Central to learning and memory.",
-		receptors: "AMPA · NMDA · mGluR",
-		clearance: "EAAT transporters on neurons and astrocytes",
+			"The brain's main fast excitatory transmitter. AMPA receptors depolarise the cell within milliseconds; NMDA receptors join in only once it is already depolarised.",
+		postsynaptic: [
+			["AMPA", 0.6],
+			["NMDA", 0.4],
+		],
+		transporter: "EAAT",
+		clearance: "EAAT transporters, mostly on astrocytes",
 		diffusion: 1.15,
-		affinity: 0.85,
-		dwell: 0.9,
 		reuptake: 9,
 		enzymatic: 0,
-		efficacy: 1,
-		mood: { happiness: 0, arousal: 0.45, anxiety: 0.15 },
-		heart: 4,
+		mood: { happiness: 0, arousal: 0.4, anxiety: 0.1 },
 	},
 	GABA: {
 		key: "GABA",
 		name: "GABA",
 		short: "GABA",
 		color: "#3fd69a",
-		polarity: "inhibitory",
-		action: "ionotropic",
+		synapse: "GABAergic",
 		role: "Primary inhibitory signal",
 		summary:
-			"The brain's main brake. GABA-A receptors open Cl⁻ channels that pull the membrane toward −80 mV, making the cell harder to fire.",
-		receptors: "GABA-A · GABA-B",
+			"The brain's main fast inhibitory transmitter. GABA-A receptors open Cl⁻ channels that hold the membrane near −80 mV, making the cell harder to fire.",
+		postsynaptic: [["GABA_A", 1]],
+		transporter: "GAT",
 		clearance: "GAT transporters on neurons and astrocytes",
 		diffusion: 1,
-		affinity: 0.8,
-		dwell: 1.1,
 		reuptake: 7,
 		enzymatic: 0,
-		efficacy: 1,
-		mood: { happiness: 0.1, arousal: -0.5, anxiety: -0.55 },
-		heart: -8,
+		mood: { happiness: 0.05, arousal: -0.5, anxiety: -0.5 },
 	},
 	DOPAMINE: {
 		key: "DOPAMINE",
 		name: "Dopamine",
 		short: "DA",
 		color: "#b07cff",
-		polarity: "excitatory",
-		action: "metabotropic",
-		role: "Reward, motivation, movement",
+		synapse: "Dopaminergic",
+		role: "Reward prediction, motivation, movement",
 		summary:
-			"A neuromodulator that signals reward prediction and drives motivation. Acts mostly through slower G-protein-coupled D1–D5 receptors.",
-		receptors: "D1–D5 (GPCR)",
-		clearance: "DAT reuptake; MAO and COMT breakdown",
+			"A neuromodulator. It doesn't fire cells directly: excitatory D1 and inhibitory D2 receptors adjust excitability slowly through G-proteins.",
+		postsynaptic: [
+			["D1", 0.5],
+			["D2", 0.5],
+		],
+		transporter: "DAT",
+		clearance: "DAT reuptake; broken down by MAO (inside cells) and COMT",
 		diffusion: 0.9,
-		affinity: 0.7,
-		dwell: 1.6,
 		reuptake: 7,
 		enzymatic: 0.7,
-		efficacy: 0.12,
-		mood: { happiness: 0.75, arousal: 0.35, anxiety: -0.05 },
-		heart: 7,
+		mood: { happiness: 0.55, arousal: 0.3, anxiety: 0 },
 	},
 	SEROTONIN: {
 		key: "SEROTONIN",
 		name: "Serotonin",
 		short: "5-HT",
 		color: "#ffb347",
-		polarity: "inhibitory",
-		action: "metabotropic",
-		role: "Mood, satiety, sleep",
+		synapse: "Serotonergic",
+		role: "Mood regulation, impulse control, sleep",
 		summary:
-			"A neuromodulator that stabilises mood and impulse control. Many 5-HT receptors are inhibitory GPCRs. SSRIs block its reuptake.",
-		receptors: "5-HT1 to 5-HT7 (mostly GPCR)",
-		clearance: "SERT reuptake; MAO breakdown",
+			"A neuromodulator acting mostly through GPCRs. Inhibitory 5-HT1A and excitatory 5-HT2A receptors pull in opposite directions. SSRIs block its transporter, SERT.",
+		postsynaptic: [
+			["HT1A", 0.5],
+			["HT2A", 0.5],
+		],
+		transporter: "SERT",
+		clearance: "SERT reuptake; broken down by MAO inside cells",
 		diffusion: 0.85,
-		affinity: 0.7,
-		dwell: 1.8,
 		reuptake: 6.5,
 		enzymatic: 0.6,
-		efficacy: 0.2,
-		mood: { happiness: 0.5, arousal: -0.1, anxiety: -0.6 },
-		heart: -3,
+		mood: { happiness: 0.2, arousal: -0.15, anxiety: -0.35 },
 	},
 	NOREPINEPHRINE: {
 		key: "NOREPINEPHRINE",
 		name: "Norepinephrine",
 		short: "NE",
 		color: "#ff6b81",
-		polarity: "excitatory",
-		action: "metabotropic",
-		role: "Alertness, fight-or-flight",
+		synapse: "Noradrenergic",
+		role: "Alertness, attention, stress response",
 		summary:
-			"Raises vigilance and readies the body for action. Drives sympathetic arousal: faster heart rate, sharper attention, and higher anxiety.",
-		receptors: "α1 · α2 · β1–β3 (GPCR)",
-		clearance: "NET reuptake; MAO and COMT breakdown",
+			"A neuromodulator that raises vigilance. Excitatory α1 and β1 receptors dominate; inhibitory α2 receptors act as a brake.",
+		postsynaptic: [
+			["ALPHA1", 0.35],
+			["BETA1", 0.4],
+			["ALPHA2", 0.25],
+		],
+		transporter: "NET",
+		clearance: "NET reuptake; broken down by MAO (inside cells) and COMT",
 		diffusion: 1.05,
-		affinity: 0.72,
-		dwell: 1.3,
 		reuptake: 6.5,
 		enzymatic: 0.7,
-		efficacy: 0.15,
-		mood: { happiness: 0, arousal: 0.8, anxiety: 0.55 },
-		heart: 26,
+		mood: { happiness: 0, arousal: 0.7, anxiety: 0.45 },
 	},
 };
 

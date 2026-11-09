@@ -997,6 +997,19 @@ input:focus-visible ~ .switch-track {
 	font-weight: 600;
 }
 
+.badge-muted {
+	color: var(--muted);
+	background: rgba(255, 255, 255, 0.04);
+	border-color: var(--line-strong);
+}
+
+.caveat {
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--muted);
+	margin: -4px 0 12px;
+}
+
 .card-body-split {
 	display: grid;
 	grid-template-columns: 1fr 1fr;

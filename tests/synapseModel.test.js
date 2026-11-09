@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { nmdaUnblocked } from "../src/config/receptors.js";
 import { MEMBRANE, PARTICLE } from "../src/config/synapse.js";
 import {
 	computeHeartRate,
@@ -142,22 +143,77 @@ describe("derived physiology", () => {
 		assert.ok(computeMood(calm).anxiety < 0);
 		assert.ok(computeMood(alarmed).anxiety > 0);
 		assert.ok(computeHeartRate(alarmed) > computeHeartRate({}));
-		assert.ok(computeHeartRate(calm) < computeHeartRate({}));
+		// Heart rate is a sympathetic analogy: only NE tone moves it.
+		assert.equal(computeHeartRate(calm), computeHeartRate({}));
+		assert.equal(computeHeartRate({ SEROTONIN: 1 }), computeHeartRate({}));
 		const extreme = computeMood({ DOPAMINE: 1, SEROTONIN: 1, GLUTAMATE: 1 });
 		for (const v of Object.values(extreme)) assert.ok(v <= 1 && v >= -1);
 	});
 });
 
-describe("neuromodulators", () => {
-	for (const key of ["DOPAMINE", "NOREPINEPHRINE"]) {
-		it(`${key} depolarises but cannot fire the cell on its own`, () => {
+describe("receptor specificity", () => {
+	it("assigns the synapse's own receptor subtypes", () => {
+		const model = new SynapseModel({ seed: 12 });
+		model.setTransmitter("DOPAMINE");
+		const kinds = new Set(model.receptors.map((r) => r.type.key));
+		assert.deepEqual([...kinds].sort(), ["D1", "D2"]);
+		for (const r of model.receptors) assert.equal(r.type.ligand, "DOPAMINE");
+	});
+
+	it("glutamate never binds dopamine receptors", () => {
+		const model = new SynapseModel({ seed: 13 });
+		model.setTransmitter("DOPAMINE");
+		model.injectTransmitter("GLUTAMATE", 120);
+		run(model, 6);
+		assert.equal(model.stats.bindings, 0);
+		assert.equal(model.stats.reuptaken, 0, "DAT does not carry glutamate");
+	});
+
+	it("switching synapse type releases mismatched ligands", () => {
+		const model = new SynapseModel({ seed: 14 });
+		fire(model, 2);
+		assert.ok(model.boundCount > 0);
+		model.setTransmitter("GABA");
+		assert.equal(model.boundCount, 0);
+	});
+});
+
+describe("NMDA receptors", () => {
+	it("are Mg²⁺-blocked at rest and unblock with depolarisation", () => {
+		assert.ok(nmdaUnblocked(-70) < 0.06);
+		assert.ok(nmdaUnblocked(-20) > 0.35);
+		assert.ok(nmdaUnblocked(0) > nmdaUnblocked(-40));
+	});
+});
+
+describe("metabotropic signalling", () => {
+	it("builds up after binding rather than instantly", () => {
+		const model = new SynapseModel({ seed: 15 });
+		model.setTransmitter("NOREPINEPHRINE");
+		model.injectTransmitter("NOREPINEPHRINE", 150);
+		run(model, 0.25);
+		const early = model.messenger.Gs + model.messenger.Gq;
+		run(model, 1.5);
+		const late = model.messenger.Gs + model.messenger.Gq;
+		assert.ok(late > early * 1.5, `early ${early}, late ${late}`);
+	});
+
+	for (const key of ["DOPAMINE", "SEROTONIN", "NOREPINEPHRINE"]) {
+		it(`${key} cannot fire the cell on its own`, () => {
 			const model = new SynapseModel({ seed: 11 });
 			model.setTransmitter(key);
 			model.setFlag("reuptakeBlocked", true);
 			model.setFlag("enzymesBlocked", true);
 			fire(model, 12, 0.3);
 			assert.equal(model.stats.spikes, 0);
-			assert.ok(model.voltage > MEMBRANE.rest + 2);
 		});
 	}
+
+	it("norepinephrine depolarises; D2-heavy signalling does not", () => {
+		const ne = new SynapseModel({ seed: 16 });
+		ne.setTransmitter("NOREPINEPHRINE");
+		ne.injectTransmitter("NOREPINEPHRINE", 200);
+		run(ne, 2);
+		assert.ok(ne.voltage > MEMBRANE.rest + 2, `NE at ${ne.voltage}`);
+	});
 });

@@ -1,10 +1,17 @@
 import { NEUROTRANSMITTERS, NT_ORDER } from "../config/neurotransmitters.js";
 import {
+	isExcitatory,
+	nmdaUnblocked,
+	RECEPTOR_TYPES,
+} from "../config/receptors.js";
+import {
 	ACTION_POTENTIAL,
 	CLEFT,
 	ENZYMES,
+	FIRING_RATE_TAU,
 	HISTORY,
 	MEMBRANE,
+	MESSENGER,
 	PARTICLE,
 	RECEPTORS,
 	TONE,
@@ -44,6 +51,7 @@ export class SynapseModel {
 		};
 
 		this.receptors = this._createReceptors();
+		this._assignReceptorTypes();
 		this.transporters = this._createTransporters();
 		this.enzymes = this._createEnzymes();
 		this.vesicles = this._createVesicles();
@@ -69,6 +77,10 @@ export class SynapseModel {
 
 		this.voltage = MEMBRANE.rest;
 		this._refractoryUntil = 0;
+		this.messenger = { Gs: 0, Gq: 0, Gi: 0 };
+		this.conductance = { excitatory: 0, inhibitory: 0 };
+		/** Smoothed postsynaptic firing rate (spikes/s). */
+		this.firingRate = 0;
 
 		this.tone = Object.fromEntries(NT_ORDER.map((k) => [k, 0]));
 		this.stats = {
@@ -80,6 +92,7 @@ export class SynapseModel {
 			escaped: 0,
 			spikes: 0,
 			failures: 0,
+			injected: 0,
 		};
 
 		for (const r of this.receptors) {
@@ -106,10 +119,12 @@ export class SynapseModel {
 	setTransmitter(key) {
 		if (!NEUROTRANSMITTERS[key] || key === this.settings.transmitter) return;
 		this.settings.transmitter = key;
-		// Vesicles waiting in the pool are refilled with the new transmitter.
+		// A different transmitter means a different synapse (Dale's principle):
+		// vesicles are refilled and the postsynaptic receptor mix changes.
 		for (const v of this.vesicles) {
 			if (v.state === "ready") v.type = key;
 		}
+		this._assignReceptorTypes();
 		this.emit("settings:changed", { transmitter: key });
 	}
 
@@ -132,6 +147,22 @@ export class SynapseModel {
 	/** @param {number} n */
 	setVesiclesPerSpike(n) {
 		this.settings.vesiclesPerSpike = Math.max(1, Math.min(8, Math.round(n)));
+	}
+
+	/**
+	 * Place transmitter directly into the cleft at the presynaptic face,
+	 * bypassing vesicles (used for experiments and tests).
+	 * @param {string} type
+	 * @param {number} count
+	 */
+	injectTransmitter(type, count) {
+		if (!NEUROTRANSMITTERS[type]) return;
+		for (let i = 0; i < count; i++) {
+			const a = this.rng.next() * Math.PI * 2;
+			const r = Math.sqrt(this.rng.next()) * 1.6;
+			if (!this._spawnParticle(type, Math.cos(a) * r, Math.sin(a) * r)) break;
+			this.stats.injected++;
+		}
 	}
 
 	/** Launch an action potential down the presynaptic axon. */
@@ -196,6 +227,9 @@ export class SynapseModel {
 				const jitter = ring.r === 0 ? 0 : (this.rng.next() - 0.5) * 0.12;
 				receptors.push({
 					id: id++,
+					/** Stable random value that picks this slot's subtype. */
+					slot: this.rng.next(),
+					type: null,
 					x: CLEFT.xPost,
 					y: Math.cos(a) * (ring.r + jitter),
 					z: Math.sin(a) * (ring.r + jitter),
@@ -209,6 +243,26 @@ export class SynapseModel {
 			}
 		}
 		return receptors;
+	}
+
+	/** Give each postsynaptic slot a subtype from the current synapse recipe. */
+	_assignReceptorTypes() {
+		const mix = NEUROTRANSMITTERS[this.settings.transmitter].postsynaptic;
+		for (const r of this.receptors) {
+			let acc = 0;
+			let key = mix[mix.length - 1][0];
+			for (const [k, fraction] of mix) {
+				acc += fraction;
+				if (r.slot < acc) {
+					key = k;
+					break;
+				}
+			}
+			const type = RECEPTOR_TYPES[key];
+			if (r.particle && r.particle.type !== type.ligand)
+				this._unbind(r.particle);
+			r.type = type;
+		}
 	}
 
 	_createTransporters() {
@@ -420,25 +474,33 @@ export class SynapseModel {
 		}
 	}
 
+	/** @returns {boolean} false when the particle cap is reached. */
+	_spawnParticle(type, y, z) {
+		if (this.particles.length >= PARTICLE.maxCount) return false;
+		this.particles.push({
+			id: this._nextId++,
+			type,
+			state: "free",
+			x: CLEFT.xPre + PARTICLE.radius + this.rng.next() * 0.08,
+			y,
+			z,
+			t: 0,
+			age: 0,
+			receptor: null,
+			target: null,
+		});
+		return true;
+	}
+
 	_releaseContents(v) {
 		const n = VESICLES.transmittersPerVesicle;
 		let released = 0;
 		for (let i = 0; i < n; i++) {
-			if (this.particles.length >= PARTICLE.maxCount) break;
 			const a = this.rng.next() * Math.PI * 2;
 			const r = this.rng.next() * 0.22;
-			this.particles.push({
-				id: this._nextId++,
-				type: v.type,
-				state: "free",
-				x: CLEFT.xPre + PARTICLE.radius + this.rng.next() * 0.08,
-				y: v.y + Math.cos(a) * r,
-				z: v.z + Math.sin(a) * r,
-				t: 0,
-				age: 0,
-				receptor: null,
-				target: null,
-			});
+			const y = v.y + Math.cos(a) * r;
+			const z = v.z + Math.sin(a) * r;
+			if (!this._spawnParticle(v.type, y, z)) break;
 			released++;
 		}
 		this.stats.released += released;
@@ -513,7 +575,7 @@ export class SynapseModel {
 			const maxX = CLEFT.xPost - PARTICLE.radius;
 			if (p.x < minX) p.x = 2 * minX - p.x;
 			if (p.x > maxX) {
-				if (this._tryBind(p, nt)) return false;
+				if (this._tryBind(p)) return false;
 				p.x = 2 * maxX - p.x;
 			}
 		}
@@ -524,8 +586,13 @@ export class SynapseModel {
 			return true;
 		}
 
-		// Reuptake transporters sit on the periphery of both membranes.
-		if (!this.settings.reuptakeBlocked && radial > 1.5) {
+		// Reuptake transporters sit on the periphery of both membranes and
+		// carry only this synapse's transmitter (DAT, SERT, EAAT…).
+		if (
+			!this.settings.reuptakeBlocked &&
+			p.type === this.settings.transmitter &&
+			radial > 1.5
+		) {
 			const chance = 1 - Math.exp(-nt.reuptake * h);
 			for (const t of this.transporters) {
 				if (dist2(p, t) < TRANSPORTERS.captureRadius ** 2) {
@@ -560,7 +627,7 @@ export class SynapseModel {
 		return false;
 	}
 
-	_tryBind(p, nt) {
+	_tryBind(p) {
 		let best = null;
 		let bestD = RECEPTORS.captureRadius ** 2;
 		for (const r of this.receptors) {
@@ -570,12 +637,14 @@ export class SynapseModel {
 				best = r;
 			}
 		}
+		// Receptors only recognise their own ligand.
 		if (
 			!best ||
+			best.type.ligand !== p.type ||
 			best.particle ||
 			best.blocked ||
 			this.time < best.refractoryUntil ||
-			this.rng.next() > nt.affinity
+			this.rng.next() > best.type.affinity
 		) {
 			return false;
 		}
@@ -585,11 +654,15 @@ export class SynapseModel {
 		p.x = best.x - PARTICLE.radius * 2.6;
 		p.y = best.y;
 		p.z = best.z;
-		p.unbindAt = this.time + this.rng.exponential(nt.dwell);
+		p.unbindAt = this.time + this.rng.exponential(best.type.dwell);
 		best.particle = p;
 		best.lastType = p.type;
 		this.stats.bindings++;
-		this.emit("nt:bound", { type: p.type, polarity: nt.polarity });
+		this.emit("nt:bound", {
+			type: p.type,
+			receptor: best.type.key,
+			polarity: isExcitatory(best.type) ? "excitatory" : "inhibitory",
+		});
 		return true;
 	}
 
@@ -613,16 +686,39 @@ export class SynapseModel {
 	}
 
 	_updateMembrane(h) {
-		let gE = 0;
-		let gI = 0;
+		const v = this.voltage;
+		let gCation = 0;
+		let gChloride = 0;
+		const drive = { Gs: 0, Gq: 0, Gi: 0 };
+
 		for (const r of this.receptors) {
 			if (!r.particle) continue;
-			const nt = NEUROTRANSMITTERS[r.particle.type];
-			const g = MEMBRANE.conductance * nt.efficacy;
-			if (nt.polarity === "excitatory") gE += g;
-			else gI += g;
+			const type = r.type;
+			if (type.kind === "metabotropic") {
+				drive[type.effector] += type.gain;
+				continue;
+			}
+			let g = MEMBRANE.conductance * type.gain;
+			if (type.mgBlock) g *= nmdaUnblocked(v);
+			if (type.effector === "cation") gCation += g;
+			else gChloride += g;
 		}
-		this.conductance = { excitatory: gE, inhibitory: gI };
+
+		// G-protein messengers build up and decay slowly.
+		for (const key of Object.keys(this.messenger)) {
+			const m = this.messenger[key];
+			const tau = drive[key] > m ? MESSENGER.rise : MESSENGER.decay;
+			this.messenger[key] += ((drive[key] - m) * h) / tau;
+		}
+		const gSlowCation =
+			(this.messenger.Gs + this.messenger.Gq) * MESSENGER.conductance;
+		const gGirk = this.messenger.Gi * MESSENGER.conductance;
+
+		this.conductance = {
+			excitatory: gCation + gSlowCation,
+			inhibitory: gChloride + gGirk,
+		};
+		this.firingRate *= Math.exp(-h / FIRING_RATE_TAU);
 
 		if (this.time < this._refractoryUntil) {
 			this.voltage += ((MEMBRANE.reset - this.voltage) * h) / 0.03;
@@ -630,9 +726,10 @@ export class SynapseModel {
 		}
 
 		const dv =
-			(MEMBRANE.rest - this.voltage) / MEMBRANE.tau +
-			gE * (MEMBRANE.excitatoryReversal - this.voltage) +
-			gI * (MEMBRANE.inhibitoryReversal - this.voltage);
+			(MEMBRANE.rest - v) / MEMBRANE.tau +
+			(gCation + gSlowCation) * (MEMBRANE.excitatoryReversal - v) +
+			gChloride * (MEMBRANE.inhibitoryReversal - v) +
+			gGirk * (MEMBRANE.potassiumReversal - v);
 		this.voltage += dv * h;
 
 		if (this.voltage >= MEMBRANE.threshold) {
@@ -640,6 +737,7 @@ export class SynapseModel {
 			this._refractoryUntil = this.time + MEMBRANE.refractory;
 			this._spikedThisSample = true;
 			this.stats.spikes++;
+			this.firingRate += 1 / FIRING_RATE_TAU;
 			this.postSpikes.push({ start: this.time });
 			this.emit("post:spike");
 		}
@@ -688,10 +786,13 @@ export class SynapseModel {
 }
 
 /**
- * Derive a mood vector (each axis in [-1, 1]) from transmitter tone.
+ * Illustrative mood vector (each axis in [-1, 1]) from slow transmitter tone
+ * and postsynaptic firing. A teaching device, not a model of real mood,
+ * which emerges from whole circuits over days to weeks.
  * @param {Record<string, number>} tone
+ * @param {number} [firingRate] Postsynaptic spikes/s.
  */
-export function computeMood(tone) {
+export function computeMood(tone, firingRate = 0) {
 	const mood = { happiness: 0, arousal: 0, anxiety: 0 };
 	for (const key of NT_ORDER) {
 		const level = tone[key] || 0;
@@ -700,6 +801,7 @@ export function computeMood(tone) {
 		mood.arousal += weights.arousal * level;
 		mood.anxiety += weights.anxiety * level;
 	}
+	mood.arousal += Math.min(0.35, firingRate * 0.08);
 	for (const axis of Object.keys(mood)) {
 		mood[axis] = Math.max(-1, Math.min(1, mood[axis] * 1.6));
 	}
@@ -707,15 +809,13 @@ export function computeMood(tone) {
 }
 
 /**
- * Target heart rate implied by transmitter tone.
+ * Heart-rate analogy. Real heart rate is set by peripheral autonomic nerves,
+ * so only noradrenergic (sympathetic-like) tone moves it here.
  * @param {Record<string, number>} tone
  * @param {number} [base]
  */
 export function computeHeartRate(tone, base = 68) {
-	let bpm = base;
-	for (const key of NT_ORDER) {
-		bpm += NEUROTRANSMITTERS[key].heart * (tone[key] || 0) * 1.6;
-	}
+	const bpm = base + 48 * (tone.NOREPINEPHRINE || 0);
 	return Math.max(42, Math.min(170, bpm));
 }
 

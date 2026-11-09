@@ -1,4 +1,5 @@
 import { NEUROTRANSMITTERS, NT_ORDER } from "../config/neurotransmitters.js";
+import { isExcitatory, RECEPTOR_TYPES } from "../config/receptors.js";
 import { MEMBRANE, PARTICLE } from "../config/synapse.js";
 import { CAMERA_PRESETS } from "../render/sceneManager.js";
 import { LineChart } from "./lineChart.js";
@@ -94,16 +95,20 @@ export class Hud {
 			btn.tabIndex = on ? 0 : -1;
 		}
 		$("#nt-info").innerHTML = `
-			<div class="nt-title"><h3>${nt.name}</h3><span class="nt-role">${nt.role}</span></div>
+			<div class="nt-title"><h3>${nt.synapse} synapse</h3><span class="nt-role">${nt.role}</span></div>
 			<div class="nt-tags">
-				<span class="tag tag-${nt.polarity}">${nt.polarity}</span>
-				<span class="tag">${nt.action}</span>
+				${nt.postsynaptic.map(([key, f]) => receptorTag(key, f)).join("")}
 			</div>
 			<p class="nt-summary">${nt.summary}</p>
 			<details class="nt-more"${this._factsOpen ? " open" : ""}>
-				<summary>Receptors &amp; clearance</summary>
+				<summary>Receptor subtypes &amp; clearance</summary>
 				<dl class="nt-facts">
-					<dt>Receptors</dt><dd>${nt.receptors}</dd>
+					${nt.postsynaptic
+						.map(
+							([key]) =>
+								`<dt>${RECEPTOR_TYPES[key].name}</dt><dd>${RECEPTOR_TYPES[key].note}</dd>`,
+						)
+						.join("")}
 					<dt>Cleared by</dt><dd>${nt.clearance}</dd>
 				</dl>
 			</details>`;
@@ -506,6 +511,17 @@ export class Hud {
 		this.voltageChart.draw();
 		this.cleftChart.draw();
 	}
+}
+
+/**
+ * Chip naming a receptor subtype, its share of the receptor field, and
+ * whether it is a channel or a GPCR.
+ */
+function receptorTag(key, fraction) {
+	const type = RECEPTOR_TYPES[key];
+	const polarity = isExcitatory(type) ? "excitatory" : "inhibitory";
+	const kind = type.kind === "ionotropic" ? "channel" : "GPCR";
+	return `<span class="tag tag-${polarity}" title="${polarity} ${kind}">${type.name} · ${Math.round(fraction * 100)}% · ${kind}</span>`;
 }
 
 /** @param {HTMLInputElement} input */

@@ -48,7 +48,7 @@ const STEPS = [
 	{
 		title: "Lock and key",
 		body: [
-			"Molecules diffuse across the cleft. When one lands on a receptor it binds briefly, and the receptor glows gold if it's excitatory, cyan if it's inhibitory.",
+			"Molecules diffuse across the cleft. A receptor only binds its own transmitter. Ring-shaped channels act instantly; seven-sided GPCRs act slowly through G-proteins. Gold means excitatory, cyan inhibitory.",
 		],
 		view: "receptors",
 		task: { label: "Watch a receptor bind", event: "nt:bound" },
@@ -83,10 +83,10 @@ const STEPS = [
 		},
 	},
 	{
-		title: "Body and mood",
+		title: "Downstream effects (illustrative)",
 		body: [
-			"Sustained signalling shifts a stylised mood and heart rate. Norepinephrine speeds the heart and raises anxiety; GABA calms both.",
-			"These links are simplified for teaching, not a clinical model.",
+			"Sustained signalling drives an illustrative mood face, and noradrenergic tone drives a heart-rate analogy.",
+			"Treat these as cartoons: real mood depends on whole circuits over weeks, and the heart is controlled by peripheral nerves.",
 		],
 		target: "body",
 	},
