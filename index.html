@@ -1,122 +1,262 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Neurotransmitter Simulation</title>
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        background-color: #1a1a1a;
-        color: #ffffff;
-        font-family: Arial, sans-serif;
-      }
-      #info {
-        position: absolute;
-        top: 10px;
-        width: 100%;
-        text-align: center;
-        z-index: 100;
-        pointer-events: none;
-      }
-      .controls {
-        position: absolute;
-        bottom: 20px;
-        width: 100%;
-        text-align: center;
-        z-index: 100;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-      }
-      .controls > div {
-        display: flex;
-        gap: 5px;
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-      button,
-      select {
-        background: #333;
-        color: #fff;
-        border: 1px solid #444;
-        padding: 8px 15px;
-        border-radius: 4px;
-        margin: 0 5px;
-        cursor: pointer;
-        transition: all 0.3s;
-      }
-      button:hover {
-        background: #444;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-      }
-      #viewBtn {
-        font-size: 16px;
-        padding: 10px 20px;
-        border: 2px solid #6688ff;
-      }
-      #inhibitBtn {
-        margin-top: 10px;
-        padding: 10px 20px;
-        transition: background-color 0.3s;
-      }
-      #inhibitBtn:hover {
-        background: #444;
-      }
-      .info-panel {
-        position: absolute;
-        top: 80px;
-        right: 20px;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 15px;
-        border-radius: 5px;
-        max-width: 250px;
-      }
-      #effects {
-        font-size: 14px;
-        line-height: 1.4;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="info">
-      <h2>Neurotransmitter Simulation</h2>
-      <p>Blue: Excitatory | Green: Inhibitory</p>
-    </div>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Synapse Lab</title>
+		<meta
+			name="description"
+			content="Interactive 3D simulation of chemical neurotransmission: release, binding, reuptake, pharmacology and postsynaptic firing."
+		/>
+		<link
+			rel="icon"
+			href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='9' cy='16' r='7' fill='%23a291ff'/%3E%3Ccircle cx='23' cy='16' r='7' fill='%2362c8ff'/%3E%3Ccircle cx='16' cy='12' r='1.6' fill='%23ffd166'/%3E%3Ccircle cx='16' cy='18' r='1.6' fill='%23ffd166'/%3E%3C/svg%3E"
+		/>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="styles/main.css" />
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+					"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<div class="app" id="app">
+			<div class="viewport" id="viewport" aria-label="3D view of the synapse. Drag to orbit, scroll to zoom."></div>
 
-    <div class="controls">
-      <div>
-        <!-- View button will be inserted here by JavaScript -->
-        <!-- Tutorial button will be inserted here by JavaScript -->
-      </div>
-      <div>
-        <select id="ntType">
-          <option value="DOPAMINE">Dopamine (Reward)</option>
-          <option value="SEROTONIN">Serotonin (Mood)</option>
-          <option value="GLUTAMATE">Glutamate (Excitatory)</option>
-          <option value="GABA">GABA (Inhibitory)</option>
-          <option value="NOREPINEPHRINE">Norepinephrine (Arousal)</option>
-        </select>
-        <button type="button" id="releaseBtn">🚀 Release Neurotransmitters</button>
-        <button type="button" id="resetBtn">🔄 Reset</button>
-      </div>
-    </div>
-    <div class="info-panel" id="emotionalFace">
-      <h3>Current Effects:</h3>
-      <div id="effects"></div>
-    </div>
+			<header class="topbar">
+				<div class="brand">
+					<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+						<circle cx="8" cy="16" r="7" />
+						<circle cx="24" cy="16" r="7" />
+						<circle cx="16" cy="11.5" r="1.6" />
+						<circle cx="16" cy="16" r="1.6" />
+						<circle cx="16" cy="20.5" r="1.6" />
+					</svg>
+					<div>
+						<h1>Synapse Lab</h1>
+						<p>Chemical neurotransmission, live</p>
+					</div>
+				</div>
 
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-        }
-      }
-    </script>
-    <script type="module" src="simulation.js"></script>
-  </body>
+				<div class="topbar-status">
+					<span class="chip" id="status-chip"><span class="dot"></span><span id="status-text">Running</span></span>
+					<span class="chip chip-mono" id="clock-chip">t 0.0 s</span>
+				</div>
+
+				<div class="topbar-actions">
+					<button type="button" class="btn btn-ghost panel-toggle" data-panel="controls" aria-expanded="false">Controls</button>
+					<button type="button" class="btn btn-ghost panel-toggle" data-panel="readouts" aria-expanded="false">Readouts</button>
+					<button type="button" class="btn btn-ghost" id="labels-btn" aria-pressed="true" title="Toggle labels (L)">Labels</button>
+					<button type="button" class="btn btn-ghost" id="shortcuts-btn" title="Keyboard shortcuts (?)">Shortcuts</button>
+					<button type="button" class="btn btn-accent" id="tour-btn">Guided tour</button>
+				</div>
+			</header>
+
+			<aside class="panel panel-left" id="panel-controls" aria-label="Controls">
+				<section class="card" data-tour="transmitters">
+					<header class="card-head">
+						<h2>Neurotransmitter</h2>
+						<span class="hint">1 – 5</span>
+					</header>
+					<div class="nt-list" id="nt-list" role="radiogroup" aria-label="Neurotransmitter"></div>
+					<article class="nt-info" id="nt-info" aria-live="polite"></article>
+				</section>
+
+				<section class="card" data-tour="stimulate">
+					<header class="card-head">
+						<h2>Stimulate</h2>
+					</header>
+					<button type="button" class="btn-fire" id="fire-btn">
+						<span class="btn-fire-icon" aria-hidden="true"></span>
+						<span>Fire action potential</span>
+						<kbd>Space</kbd>
+					</button>
+
+					<div class="field">
+						<label class="switch">
+							<input type="checkbox" id="autofire-toggle" />
+							<span class="switch-track" aria-hidden="true"></span>
+							<span>Auto-fire</span>
+						</label>
+						<div class="slider-row">
+							<input type="range" id="rate-slider" min="0.5" max="6" step="0.5" value="1.5" aria-label="Firing rate" />
+							<output id="rate-out" class="mono">1.5 Hz</output>
+						</div>
+					</div>
+
+					<div class="field">
+						<span class="field-label">Vesicles per spike</span>
+						<div class="slider-row">
+							<input type="range" id="vesicle-slider" min="1" max="8" step="1" value="3" aria-label="Vesicles released per spike" />
+							<output id="vesicle-out" class="mono">3</output>
+						</div>
+					</div>
+
+					<div class="pool">
+						<div class="pool-head">
+							<span class="field-label">Readily releasable pool</span>
+							<span class="mono" id="pool-out">26 / 26</span>
+						</div>
+						<div class="meter"><div class="meter-fill" id="pool-meter"></div></div>
+					</div>
+				</section>
+
+				<section class="card" data-tour="pharmacology">
+					<header class="card-head">
+						<h2>Pharmacology</h2>
+					</header>
+					<div class="drug-list">
+						<label class="drug">
+							<input type="checkbox" data-flag="reuptakeBlocked" />
+							<span class="drug-body">
+								<span class="drug-name">Reuptake inhibitor</span>
+								<span class="drug-desc"><span>Blocks transporters, so transmitter lingers. SSRIs, cocaine.</span></span>
+							</span>
+							<span class="switch-track" aria-hidden="true"></span>
+						</label>
+						<label class="drug">
+							<input type="checkbox" data-flag="enzymesBlocked" />
+							<span class="drug-body">
+								<span class="drug-name">Enzyme inhibitor</span>
+								<span class="drug-desc"><span>Stops MAO/COMT breaking down monoamines. MAOIs.</span></span>
+							</span>
+							<span class="switch-track" aria-hidden="true"></span>
+						</label>
+						<label class="drug">
+							<input type="checkbox" data-flag="antagonist" />
+							<span class="drug-body">
+								<span class="drug-name">Receptor antagonist</span>
+								<span class="drug-desc"><span>Occupies ~70% of receptors without activating them. Antipsychotics.</span></span>
+							</span>
+							<span class="switch-track" aria-hidden="true"></span>
+						</label>
+					</div>
+				</section>
+			</aside>
+
+			<aside class="panel panel-right" id="panel-readouts" aria-label="Readouts">
+				<section class="card" data-tour="potential">
+					<header class="card-head">
+						<h2>Postsynaptic potential</h2>
+						<span class="badge" id="spike-badge">0 spikes</span>
+					</header>
+					<div class="readout">
+						<span class="readout-value mono" id="voltage-out">−70.0</span>
+						<span class="readout-unit">mV</span>
+						<span class="readout-tag" id="voltage-tag">At rest</span>
+					</div>
+					<canvas class="chart" id="voltage-chart" aria-label="Membrane potential over the last 20 seconds"></canvas>
+				</section>
+
+				<section class="card" data-tour="cleft">
+					<header class="card-head">
+						<h2>Synaptic cleft</h2>
+						<span class="legend">
+							<span class="legend-item"><i class="swatch" id="free-swatch"></i>Free</span>
+							<span class="legend-item"><i class="swatch swatch-occ"></i>Occupancy</span>
+						</span>
+					</header>
+					<canvas class="chart" id="cleft-chart" aria-label="Free transmitter and receptor occupancy over the last 20 seconds"></canvas>
+					<dl class="stats" id="stats">
+						<div><dt>Released</dt><dd class="mono" data-stat="released">0</dd></div>
+						<div><dt>Bindings</dt><dd class="mono" data-stat="bindings">0</dd></div>
+						<div><dt>Reuptake</dt><dd class="mono" data-stat="reuptaken">0</dd></div>
+						<div><dt>Enzymes</dt><dd class="mono" data-stat="degraded">0</dd></div>
+						<div><dt>Diffused</dt><dd class="mono" data-stat="escaped">0</dd></div>
+						<div><dt>Failures</dt><dd class="mono" data-stat="failures">0</dd></div>
+					</dl>
+				</section>
+
+				<section class="card card-body-split" data-tour="body">
+					<div class="split-col">
+						<header class="card-head"><h2>Mood</h2></header>
+						<div class="mood">
+							<svg class="face" id="face" viewBox="0 0 120 120" role="img" aria-label="Mood face"></svg>
+							<div class="mood-bars" id="mood-bars"></div>
+						</div>
+					</div>
+					<div class="split-col">
+						<header class="card-head"><h2>Heart</h2></header>
+						<div class="heart">
+							<div class="heart-readout">
+								<svg class="heart-icon" id="heart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.6 1.2 4.4 2.4h1.8c.8-1.2 2.2-2.4 4.4-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>
+								<span class="readout-value mono" id="bpm-out">68</span>
+								<span class="readout-unit">bpm</span>
+							</div>
+							<canvas class="ecg" id="ecg"></canvas>
+							<span class="heart-status" id="heart-status">Normal sinus rhythm</span>
+						</div>
+					</div>
+				</section>
+			</aside>
+
+			<footer class="dock" data-tour="dock">
+				<div class="dock-group">
+					<button type="button" class="btn btn-fire-mini" id="dock-fire-btn" title="Fire action potential (Space)">Fire</button>
+					<button type="button" class="btn btn-icon" id="pause-btn" aria-pressed="false" title="Pause (P)">
+						<svg viewBox="0 0 24 24" class="icon-pause" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+						<svg viewBox="0 0 24 24" class="icon-play" aria-hidden="true"><path d="M7 5.5v13a1 1 0 0 0 1.5.9l10.4-6.5a1 1 0 0 0 0-1.8L8.5 4.6A1 1 0 0 0 7 5.5z"/></svg>
+						<span class="sr-only">Pause</span>
+					</button>
+					<div class="segmented" id="speed-group" role="radiogroup" aria-label="Simulation speed">
+						<button type="button" role="radio" data-speed="0.25" aria-checked="false">¼×</button>
+						<button type="button" role="radio" data-speed="0.5" aria-checked="false">½×</button>
+						<button type="button" role="radio" data-speed="1" aria-checked="true">1×</button>
+						<button type="button" role="radio" data-speed="2" aria-checked="false">2×</button>
+					</div>
+					<button type="button" class="btn btn-ghost" id="reset-btn" title="Reset (R)">Reset</button>
+				</div>
+				<div class="dock-divider" aria-hidden="true"></div>
+				<div class="dock-group">
+					<span class="dock-label">View</span>
+					<div class="segmented" id="camera-group" role="radiogroup" aria-label="Camera view">
+						<button type="button" role="radio" data-view="overview" aria-checked="true">Overview</button>
+						<button type="button" role="radio" data-view="terminal" aria-checked="false">Terminal</button>
+						<button type="button" role="radio" data-view="cleft" aria-checked="false">Cleft</button>
+						<button type="button" role="radio" data-view="receptors" aria-checked="false">Receptors</button>
+						<button type="button" role="radio" data-view="spine" aria-checked="false">Spine</button>
+					</div>
+					<button type="button" class="btn btn-ghost" id="orbit-btn" aria-pressed="false" title="Auto-orbit (O)">Orbit</button>
+				</div>
+			</footer>
+
+			<div class="toasts" id="toasts" aria-live="polite"></div>
+			<div class="webgl-error" id="webgl-error" hidden>
+				<h2>3D view unavailable</h2>
+				<p>This simulation needs WebGL. Try a recent version of Chrome, Edge, Firefox or Safari with hardware acceleration enabled.</p>
+			</div>
+		</div>
+
+		<dialog class="dialog" id="shortcuts-dialog" aria-labelledby="shortcuts-title">
+			<form method="dialog">
+				<header class="dialog-head">
+					<h2 id="shortcuts-title">Keyboard shortcuts</h2>
+					<button type="submit" class="btn btn-icon" value="close" aria-label="Close">✕</button>
+				</header>
+				<dl class="shortcuts">
+					<div><dt><kbd>Space</kbd></dt><dd>Fire an action potential</dd></div>
+					<div><dt><kbd>A</kbd></dt><dd>Toggle auto-fire</dd></div>
+					<div><dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Choose neurotransmitter</dd></div>
+					<div><dt><kbd>P</kbd></dt><dd>Pause / resume</dd></div>
+					<div><dt><kbd>R</kbd></dt><dd>Reset simulation</dd></div>
+					<div><dt><kbd>L</kbd></dt><dd>Toggle labels</dd></div>
+					<div><dt><kbd>O</kbd></dt><dd>Toggle auto-orbit</dd></div>
+					<div><dt><kbd>V</kbd></dt><dd>Cycle camera views</dd></div>
+					<div><dt><kbd>T</kbd></dt><dd>Start the guided tour</dd></div>
+					<div><dt><kbd>?</kbd></dt><dd>Show this panel</dd></div>
+				</dl>
+			</form>
+		</dialog>
+
+		<script type="module" src="src/main.js"></script>
+	</body>
 </html>

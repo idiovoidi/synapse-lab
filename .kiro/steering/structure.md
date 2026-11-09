@@ -2,42 +2,37 @@
 
 ## Architecture Pattern
 
-Clean architecture with strict separation of concerns. Inner layers (domain/models) never depend on outer layers (rendering, UI).
+Clean architecture with strict separation of concerns. The simulation model is pure JavaScript (no Three.js, no DOM) and is unit-tested in Node. Rendering and UI read model state each frame and react to events; they never mutate model internals directly.
 
 ## Directory Organization
 
 ```
 src/
-├── constants/       # Configuration and neurotransmitter type definitions
-├── models/          # Domain entities (pure data + minimal behavior, no Three.js/DOM)
-├── simulation/      # Simulation orchestration and business logic
-├── render/          # Three.js scene management and rendering
-├── ui/              # DOM controls and event handlers
-└── utils/           # Cross-cutting utilities (event bus)
+├── config/          # Neurotransmitter catalogue and synapse geometry/physiology constants
+├── sim/             # Pure simulation: SynapseModel, mood/heart derivations, seedable RNG
+├── render/          # Three.js scene, post-processing, materials, SynapseView (anatomy + per-frame sync)
+├── ui/              # HUD bindings, charts, mood face (SVG), heart monitor, toasts, guided tour
+├── utils/           # Event bus
+└── main.js          # Bootstrap and frame loop
+styles/main.css      # Design tokens and all HUD styling
+tests/               # node:test suites for the simulation model
 ```
-
-## Key Files
-
-- `index.html`: Entry point with UI structure and import map
-- `simulation.js`: Bootstrap script that initializes all components
-- `emotionalFace.js`: Emotional face presentation layer (canvas-based)
 
 ## Communication Pattern
 
-- **Event-driven architecture**: Uses lightweight event bus (`src/utils/eventBus.js`)
-- **Core events**: `nt:released`, `nt:moved`, `nt:bound`, `nt:reuptaken`, `nt:degraded`, `sim:reset`, `sim:effectsUpdated`, `sim:moodUpdated`
-- **UI layer**: Subscribes to `sim:effectsUpdated` and `sim:moodUpdated` events
-- **Simulation layer**: Emits state changes, never directly manipulates DOM or Three.js meshes
+- **Frame loop** (`src/main.js`): `model.step(simDt)` → `view.update(simDt)` → `hud.update()` → render.
+- **Event bus** (`src/utils/eventBus.js`) carries discrete happenings from the model: `ap:fired`, `ap:arrived`, `vesicle:fused`, `nt:bound`, `nt:cleared`, `post:spike`, `release:failed`, `settings:changed`, `sim:reset`. UI events: `ui:transmitter`, `ui:tour`.
+- **Time**: everything in the model integrates simulated seconds, so behaviour is frame-rate independent; pausing/speed only scale `simDt`.
 
 ## Dependency Rules
 
-1. Models/constants have no dependencies on other layers
-2. Simulation depends on models/constants only
-3. Render and UI layers can depend on simulation but not vice versa
-4. All modules use explicit ES6 imports (no globals)
+1. `config/` depends on nothing.
+2. `sim/` depends on `config/` only, and must stay DOM- and Three.js-free so tests run in Node.
+3. `render/` and `ui/` may depend on `sim/` and `config/`, never the reverse.
+4. All modules use explicit ES module imports (no globals; `window.synapse` is a debug handle only).
 
 ## Naming Conventions
 
-- Files use camelCase (e.g., `neuronSimulation.js`)
-- Classes use PascalCase (e.g., `NeuronSimulation`)
-- Constants use SCREAMING_SNAKE_CASE (e.g., `NEUROTRANSMITTER_TYPES`)
+- Files use camelCase (e.g., `synapseModel.js`)
+- Classes use PascalCase (e.g., `SynapseModel`)
+- Constants use SCREAMING_SNAKE_CASE (e.g., `NEUROTRANSMITTERS`, `CLEFT`)

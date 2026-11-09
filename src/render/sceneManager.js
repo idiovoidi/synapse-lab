@@ -1,171 +1,154 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
+
+/** Named camera framings used by the view buttons and the tour. */
+export const CAMERA_PRESETS = {
+	overview: { position: [7.5, 5.5, 13], target: [-0.5, 0, 0] },
+	cleft: { position: [1.4, 3.4, 9.2], target: [0, 0, 0] },
+	receptors: { position: [-3.4, 1.8, 4.6], target: [1, 0, 0] },
+	terminal: { position: [-5.5, 3.6, 6.5], target: [-2.6, 0, 0] },
+	spine: { position: [7.5, 2.5, 6], target: [3, 0, 0] },
+};
 
 /**
- * Manages the Three.js scene, camera, renderer, and animation loop.
+ * Owns the renderer, post-processing, camera and controls.
  */
 export class SceneManager {
-	constructor() {
+	/** @param {HTMLElement} container */
+	constructor(container) {
+		this.container = container;
+		this.reducedMotion = window.matchMedia(
+			"(prefers-reduced-motion: reduce)",
+		).matches;
+
 		this.scene = new THREE.Scene();
-		// Darker, more professional background with subtle gradient
-		this.scene.background = new THREE.Color(0x0a0a0f);
-		this.scene.fog = new THREE.Fog(0x0a0a0f, 30, 100);
+		this.scene.background = new THREE.Color("#05070f");
+		this.scene.fog = new THREE.FogExp2("#05070f", 0.028);
 
-		this.camera = new THREE.PerspectiveCamera(
-			60, // Slightly narrower FOV for less distortion
-			window.innerWidth / window.innerHeight,
-			0.1,
-			1000,
-		);
-		// Camera modes: 'outside' or 'inside'
-		this.cameraMode = "inside"; // Start inside vesicle
-
-		// Outside view position - angled to see the 3D structure
-		this.outsidePosition = new THREE.Vector3(12, 10, 18);
-		this.outsideTarget = new THREE.Vector3(0, 0, 0);
-
-		// Inside vesicle position (inside presynaptic bouton)
-		this.insidePosition = new THREE.Vector3(-6, 2, 3);
-		this.insideTarget = new THREE.Vector3(0, 0, 0);
-
-		// Set initial position based on mode
-		if (this.cameraMode === "inside") {
-			this.camera.position.copy(this.insidePosition);
-			this.camera.lookAt(this.insideTarget);
-		} else {
-			this.camera.position.copy(this.outsidePosition);
-			this.camera.lookAt(this.outsideTarget);
-		}
+		this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+		this.camera.position.set(...CAMERA_PRESETS.overview.position);
 
 		this.renderer = new THREE.WebGLRenderer({
 			antialias: true,
-			alpha: false,
 			powerPreference: "high-performance",
 		});
-		this.renderer.setSize(window.innerWidth, window.innerHeight);
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-		this.renderer.shadowMap.enabled = true;
-		this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 		this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-		this.renderer.toneMappingExposure = 1.2;
-		document.body.appendChild(this.renderer.domElement);
+		this.renderer.toneMappingExposure = 1.05;
+		this.renderer.domElement.classList.add("scene-canvas");
+		container.appendChild(this.renderer.domElement);
 
-		// Handle resize
-		window.addEventListener("resize", () => {
-			this.camera.aspect = window.innerWidth / window.innerHeight;
-			this.camera.updateProjectionMatrix();
-			this.renderer.setSize(window.innerWidth, window.innerHeight);
-		});
+		this.labelRenderer = new CSS2DRenderer();
+		this.labelRenderer.domElement.className = "scene-labels";
+		container.appendChild(this.labelRenderer.domElement);
 
-		// Enhanced lighting setup
-		const ambientLight = new THREE.AmbientLight(0x333344, 0.4);
-		this.scene.add(ambientLight);
+		this.composer = new EffectComposer(this.renderer);
+		this.composer.addPass(new RenderPass(this.scene, this.camera));
+		this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.5, 0.78);
+		this.composer.addPass(this.bloom);
+		this.composer.addPass(new OutputPass());
 
-		// Main key light (from top-right)
-		const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
-		mainLight.position.set(15, 15, 15);
-		mainLight.castShadow = true;
-		mainLight.shadow.mapSize.width = 2048;
-		mainLight.shadow.mapSize.height = 2048;
-		mainLight.shadow.camera.near = 0.5;
-		mainLight.shadow.camera.far = 50;
-		this.scene.add(mainLight);
-
-		// Fill light (from left, cooler tone)
-		const fillLight = new THREE.DirectionalLight(0x6688ff, 0.5);
-		fillLight.position.set(-10, 5, 10);
-		this.scene.add(fillLight);
-
-		// Rim light (from behind, warm tone)
-		const rimLight = new THREE.DirectionalLight(0xffaa88, 0.6);
-		rimLight.position.set(0, 5, -15);
-		this.scene.add(rimLight);
-
-		// Spotlight on synaptic cleft
-		const spotLight = new THREE.SpotLight(0x88aaff, 0.8);
-		spotLight.position.set(0, 10, 0);
-		spotLight.angle = Math.PI / 6;
-		spotLight.penumbra = 0.3;
-		spotLight.decay = 2;
-		spotLight.distance = 30;
-		this.scene.add(spotLight);
-
-		// Orbit controls with better constraints
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 		this.controls.enableDamping = true;
-		this.controls.dampingFactor = 0.08;
-		this.controls.minDistance = 0.5; // Allow close-up in inside mode
-		this.controls.maxDistance = 60;
-		this.controls.maxPolarAngle = Math.PI * 0.75;
-		this.controls.target.copy(
-			this.cameraMode === "inside" ? this.insideTarget : this.outsideTarget,
-		);
-		this.controls.autoRotate = this.cameraMode === "inside"; // Auto-rotate inside vesicle
-		this.controls.autoRotateSpeed = 0.3;
-		this.controls.update();
+		this.controls.dampingFactor = 0.07;
+		this.controls.minDistance = 2.5;
+		this.controls.maxDistance = 40;
+		this.controls.autoRotateSpeed = 0.35;
+		this.controls.target.set(...CAMERA_PRESETS.overview.target);
+		this.controls.addEventListener("start", () => {
+			this._tween = null;
+		});
+
+		this._addLights();
+
+		this._tween = null;
+		this._preset = "overview";
+		this.resize();
+		this.camera.position.copy(this._presetPosition("overview"));
+		new ResizeObserver(() => this.resize()).observe(container);
 	}
 
 	/**
-	 * Switch between inside and outside camera views
+	 * Preset camera position, pulled back on narrow (portrait) viewports so
+	 * the synapse still fits horizontally.
+	 * @param {keyof typeof CAMERA_PRESETS} name
 	 */
-	switchCameraMode(mode) {
-		if (mode === this.cameraMode) return;
-
-		this.cameraMode = mode;
-		const duration = 2000; // 2 second transition
-		const startPos = this.camera.position.clone();
-		const startTarget = this.controls.target.clone();
-		const startTime = Date.now();
-
-		const targetPos =
-			mode === "inside" ? this.insidePosition : this.outsidePosition;
-		const targetLookAt =
-			mode === "inside" ? this.insideTarget : this.outsideTarget;
-
-		const animate = () => {
-			const elapsed = Date.now() - startTime;
-			const progress = Math.min(elapsed / duration, 1);
-			const eased = 1 - (1 - progress) ** 3; // Ease out cubic
-
-			this.camera.position.lerpVectors(startPos, targetPos, eased);
-			this.controls.target.lerpVectors(startTarget, targetLookAt, eased);
-			this.controls.update();
-
-			if (progress < 1) {
-				requestAnimationFrame(animate);
-			} else {
-				// Update controls settings for new mode
-				this.controls.autoRotate = mode === "inside";
-				this.controls.minDistance = mode === "inside" ? 0.5 : 12;
-			}
-		};
-
-		animate();
+	_presetPosition(name) {
+		const preset = CAMERA_PRESETS[name];
+		const target = new THREE.Vector3(...preset.target);
+		const offset = new THREE.Vector3(...preset.position).sub(target);
+		const stretch = Math.min(2.4, Math.max(1, 1.35 / this.camera.aspect));
+		return target.add(offset.multiplyScalar(stretch));
 	}
 
-	add(object) {
-		this.scene.add(object);
+	_addLights() {
+		this.scene.add(new THREE.HemisphereLight("#9fb7ff", "#1a0f24", 0.9));
+		const key = new THREE.DirectionalLight("#ffffff", 1.6);
+		key.position.set(6, 10, 8);
+		this.scene.add(key);
+		const rim = new THREE.DirectionalLight("#7f6bff", 1.1);
+		rim.position.set(-8, -4, -10);
+		this.scene.add(rim);
+		const cleftLight = new THREE.PointLight("#7fb0ff", 6, 9, 2);
+		cleftLight.position.set(0, 2.5, 2);
+		this.scene.add(cleftLight);
 	}
 
-	remove(object) {
-		this.scene.remove(object);
-	}
-
-	render() {
-		if (this.controls) this.controls.update();
-		this.renderer.render(this.scene, this.camera);
+	resize() {
+		const { clientWidth: w, clientHeight: h } = this.container;
+		if (w === 0 || h === 0) return;
+		this.camera.aspect = w / h;
+		this.camera.updateProjectionMatrix();
+		this.renderer.setSize(w, h);
+		this.composer.setSize(w, h);
+		this.labelRenderer.setSize(w, h);
 	}
 
 	/**
-	 * Starts the render loop and calls updateCallback each frame before rendering.
-	 * @param {() => void} updateCallback
+	 * Smoothly move the camera to a named preset.
+	 * @param {keyof typeof CAMERA_PRESETS} name
 	 */
-	startAnimationLoop(updateCallback) {
-		const animate = () => {
-			updateCallback();
-			this.render();
-			requestAnimationFrame(animate);
+	flyTo(name) {
+		const preset = CAMERA_PRESETS[name];
+		if (!preset) return;
+		this._preset = name;
+		this._tween = {
+			t: 0,
+			duration: this.reducedMotion ? 0.01 : 1.4,
+			fromPos: this.camera.position.clone(),
+			fromTarget: this.controls.target.clone(),
+			toPos: this._presetPosition(name),
+			toTarget: new THREE.Vector3(...preset.target),
 		};
-		animate();
+	}
+
+	/** @param {boolean} enabled */
+	setAutoRotate(enabled) {
+		this.controls.autoRotate = enabled && !this.reducedMotion;
+	}
+
+	/** @param {boolean} visible */
+	setLabelsVisible(visible) {
+		this.labelRenderer.domElement.classList.toggle("is-hidden", !visible);
+	}
+
+	/** @param {number} dt Real seconds since last frame. */
+	render(dt) {
+		if (this._tween) {
+			const tw = this._tween;
+			tw.t = Math.min(1, tw.t + dt / tw.duration);
+			const k = 1 - (1 - tw.t) ** 3;
+			this.camera.position.lerpVectors(tw.fromPos, tw.toPos, k);
+			this.controls.target.lerpVectors(tw.fromTarget, tw.toTarget, k);
+			if (tw.t >= 1) this._tween = null;
+		}
+		this.controls.update(dt);
+		this.composer.render(dt);
+		this.labelRenderer.render(this.scene, this.camera);
 	}
 }

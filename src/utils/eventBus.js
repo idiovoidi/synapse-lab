@@ -21,8 +21,7 @@ export function createEventBus() {
 			try {
 				handler(payload);
 			} catch (err) {
-				// Swallow to avoid breaking loop
-				// eslint-disable-next-line no-console
+				// Isolate handler failures so one bad listener cannot break the frame loop.
 				console.error("Event handler error for", eventName, err);
 			}
 		});
