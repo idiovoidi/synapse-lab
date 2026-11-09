@@ -502,3 +502,109 @@ describe("pharmacology", () => {
 		assert.ok(spikes(true) < spikes(false));
 	});
 });
+
+describe("chronic adaptation (conceptual)", () => {
+	/** Mean vesicles fused per spike over a train, averaged across seeds. */
+	const releasePerSpike = (setup) => {
+		let fusions = 0;
+		for (let seed = 80; seed < 86; seed++) {
+			const m = new SynapseModel({ seed });
+			setup(m);
+			for (let i = 0; i < 20; i++) {
+				m.fireActionPotential();
+				run(m, 0.35);
+			}
+			fusions += m.stats.fusions;
+		}
+		return fusions / (6 * 20);
+	};
+
+	it("SSRIs: acute autoreceptor brake gives way to recovered release after weeks", () => {
+		const ssri = (weeks) => (m) => {
+			m.setTransmitter("SEROTONIN");
+			m.setDrug("FLUOXETINE", 10);
+			m.setChronicWeeks(weeks);
+		};
+		const acute = releasePerSpike(ssri(0));
+		const chronic = releasePerSpike(ssri(6));
+		assert.ok(chronic > acute * 1.1, `acute ${acute}, chronic ${chronic}`);
+
+		const m = new SynapseModel({ seed: 1 });
+		m.setTransmitter("SEROTONIN");
+		m.setDrug("FLUOXETINE", 10);
+		m.setChronicWeeks(6);
+		assert.ok(m.adaptations.autoreceptorSensitivity < 0.5);
+		assert.ok(m.adaptations.notes.some((n) => n.includes("desensitised")));
+	});
+
+	it("antipsychotics up-regulate D2 receptors over weeks", () => {
+		const m = new SynapseModel({ seed: 1 });
+		m.setTransmitter("DOPAMINE");
+		m.setDrug("HALOPERIDOL", 4);
+		assert.equal(m.adaptations.upregulation.D2, 1);
+		m.setChronicWeeks(8);
+		assert.ok(m.adaptations.upregulation.D2 > 1.3);
+	});
+
+	it("benzodiazepine tolerance weakens diazepam's extra inhibition", () => {
+		const meanV = (weeks) => {
+			let total = 0;
+			for (let seed = 60; seed < 64; seed++) {
+				const m = new SynapseModel({ seed });
+				m.setTransmitter("GABA");
+				m.setDrug("DIAZEPAM", 6);
+				m.setChronicWeeks(weeks);
+				fire(m, 3, 0.4, 0.2);
+				for (let i = 0; i < 120; i++) {
+					m.step(1 / 60);
+					total += m.voltage;
+				}
+			}
+			return total / (4 * 120);
+		};
+		assert.ok(
+			meanV(8) > meanV(0) + 0.3,
+			"less hyperpolarisation after tolerance",
+		);
+	});
+
+	it("time on treatment changes nothing without drugs", () => {
+		const a = new SynapseModel({ seed: 90 });
+		const b = new SynapseModel({ seed: 90 });
+		b.setChronicWeeks(8);
+		fire(a, 4);
+		fire(b, 4);
+		assert.deepEqual(a.stats, b.stats);
+		assert.equal(a.voltage, b.voltage);
+	});
+});
+
+describe("sustained firing", () => {
+	it("fluoxetine still raises cleft serotonin during a long 2 Hz train", () => {
+		const meanFree = (m, seconds) => {
+			let sum = 0;
+			let acc = 0;
+			const steps = Math.round(seconds * 60);
+			for (let i = 0; i < steps; i++) {
+				acc += 1 / 60;
+				if (acc >= 0.5) {
+					acc = 0;
+					m.fireActionPotential();
+				}
+				m.step(1 / 60);
+				sum += m.freeCount;
+			}
+			return sum / steps;
+		};
+		let baseline = 0;
+		let treated = 0;
+		for (let seed = 1; seed < 5; seed++) {
+			const m = new SynapseModel({ seed });
+			m.setTransmitter("SEROTONIN");
+			baseline += meanFree(m, 20);
+			m.setDrug("FLUOXETINE", 4);
+			treated += meanFree(m, 20);
+		}
+		assert.ok(treated > baseline * 1.1, `baseline ${baseline}, treated ${treated}`);
+	});
+});

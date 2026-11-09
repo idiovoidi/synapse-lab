@@ -63,6 +63,11 @@ export class SynapseView {
 			]),
 		);
 
+		/** Small objects tested first when inspecting. */
+		this.pickables = [];
+		/** Large translucent structures, tested only if nothing small is hit. */
+		this.structures = [];
+
 		this._buildMembranes();
 		this._buildAxon();
 		this._buildMembraneSpecialisations();
@@ -120,6 +125,7 @@ export class SynapseView {
 			this.preMaterial,
 		);
 		this.root.add(pre);
+		this._tag(pre, "terminal", null, this.structures);
 
 		this.postMaterial = createMembraneMaterial({
 			color: PALETTE.postBase,
@@ -143,6 +149,7 @@ export class SynapseView {
 			this.postMaterial,
 		);
 		this.root.add(post);
+		this._tag(post, "spine", null, this.structures);
 
 		// Dendritic shaft the spine grows from.
 		const shaftCurve = new THREE.CatmullRomCurve3([
@@ -158,6 +165,7 @@ export class SynapseView {
 		);
 		shaft.renderOrder = 2;
 		this.root.add(shaft);
+		this._tag(shaft, "dendrite", null, this.structures);
 
 		// Mitochondria fuel vesicle cycling; MAO on their outer membrane breaks
 		// down cytosolic monoamines, so they glow with MAO activity.
@@ -185,6 +193,7 @@ export class SynapseView {
 				new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 1, 3, 8), cristae),
 			);
 			group.position.set(x, y, z);
+			this._tag(group, "mitochondrion", null, this.pickables);
 			group.rotation.set(0.3, rot, Math.PI / 2 + rot);
 			this.root.add(group);
 		}
@@ -205,6 +214,7 @@ export class SynapseView {
 		);
 		axon.renderOrder = 2;
 		this.root.add(axon);
+		this._tag(axon, "axon", null, this.structures);
 
 		// Myelin sheath segments separated by nodes of Ranvier.
 		const myelinMaterial = new THREE.MeshStandardMaterial({
@@ -266,8 +276,10 @@ export class SynapseView {
 			this.root.add(mesh);
 			return mesh;
 		};
-		disc(1.75, CLEFT.xPre - 0.04, PALETTE.activeZone, 0.55);
+		const az = disc(1.75, CLEFT.xPre - 0.04, PALETTE.activeZone, 0.55);
+		this._tag(az, "activeZone", null, this.structures);
 		this.psd = disc(2.0, CLEFT.xPost + 0.05, PALETTE.psd, 0.6);
+		this._tag(this.psd, "psd", null, this.structures);
 	}
 
 	_buildReceptors() {
@@ -295,6 +307,7 @@ export class SynapseView {
 		const group = new THREE.Group();
 		group.rotation.x = -ASTROCYTE.arc / 2;
 		group.add(mesh);
+		this._tag(mesh, "astrocyte", null, this.structures);
 		this.root.add(group);
 	}
 
@@ -349,7 +362,8 @@ export class SynapseView {
 		group.position.set(r.x, r.y, r.z);
 		group.scale.setScalar(scale);
 		this.root.add(group);
-		return { model: r, material, cap, pore, gpcr, typeKey: null };
+		this._tag(group, "receptor", r, this.pickables);
+		return { model: r, group, material, cap, pore, gpcr, typeKey: null };
 	}
 
 	_buildTransporters() {
@@ -382,6 +396,7 @@ export class SynapseView {
 				);
 			}
 			this.root.add(group);
+			this._tag(group, "transporter", t, this.pickables);
 			return { model: t, material, group };
 		});
 	}
@@ -406,6 +421,7 @@ export class SynapseView {
 			const mesh = new THREE.Mesh(geo, material);
 			mesh.rotation.set(Math.random() * 6, Math.random() * 6, 0);
 			this.root.add(mesh);
+			this._tag(mesh, "enzyme", e, this.pickables);
 			return { model: e, mesh, material };
 		});
 	}
@@ -430,6 +446,7 @@ export class SynapseView {
 			const core = new THREE.Mesh(coreGeo, coreMaterial);
 			group.add(core, shell);
 			this.root.add(group);
+			this._tag(group, "vesicle", v, this.pickables);
 			return { model: v, group, core, coreMaterial, type: null };
 		});
 	}
@@ -447,6 +464,7 @@ export class SynapseView {
 		this.particleMesh.count = 0;
 		this.particleMesh.frustumCulled = false;
 		this.root.add(this.particleMesh);
+		this._tag(this.particleMesh, "particle", null, this.pickables);
 
 		// Soft halos rendered as additive point sprites.
 		const haloGeo = new THREE.BufferGeometry();
@@ -603,6 +621,18 @@ export class SynapseView {
 			return sprite;
 		});
 		this._flashIndex = 0;
+	}
+
+	/**
+	 * Mark an object as inspectable.
+	 * @param {THREE.Object3D} object
+	 * @param {string} kind
+	 * @param {object | null} ref Model object it represents.
+	 * @param {THREE.Object3D[]} registry
+	 */
+	_tag(object, kind, ref, registry) {
+		object.userData.pick = { kind, ref };
+		registry.push(object);
 	}
 
 	/**
@@ -781,6 +811,13 @@ export class SynapseView {
 			.lerp(target, r.activation * 0.85);
 		view.material.emissive.copy(target);
 		view.material.emissiveIntensity = r.activation * 0.75;
+
+		// Shape cue so activity isn't encoded by colour alone: excitatory
+		// receptors swell, inhibitory ones flatten against the membrane.
+		const a = r.activation;
+		const head = r.type.kind === "metabotropic" ? view.gpcr : view.pore;
+		if (isExcitatory(r.type)) head.scale.setScalar(1 + 0.45 * a);
+		else head.scale.set(1 - 0.5 * a, 1 + 0.3 * a, 1 + 0.3 * a);
 	}
 
 	_syncTransporters() {

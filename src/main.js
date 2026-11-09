@@ -7,6 +7,7 @@ import {
 } from "./sim/synapseModel.js";
 import { HeartMonitor } from "./ui/heartMonitor.js";
 import { Hud } from "./ui/hud.js";
+import { Inspector } from "./ui/inspector.js";
 import { MoodFace } from "./ui/moodFace.js";
 import { createToaster } from "./ui/toasts.js";
 import { Tour } from "./ui/tour.js";
@@ -27,6 +28,12 @@ function boot() {
 	}
 
 	const view = new SynapseView(sceneManager.scene, model);
+	const inspector = new Inspector({
+		sceneManager,
+		view,
+		model,
+		container: document.getElementById("app"),
+	});
 	const hud = new Hud({ model, sceneManager, bus, toaster });
 	const tour = new Tour({ hud, bus });
 	document.getElementById("tour-btn").addEventListener("click", () => {
@@ -66,6 +73,7 @@ function boot() {
 		heart.update(hud.state.paused ? 0 : dt);
 
 		sceneManager.render(dt);
+		inspector.update();
 		requestAnimationFrame(frame);
 	}
 	requestAnimationFrame(frame);
@@ -77,7 +85,7 @@ function boot() {
 	}
 
 	// Handy for debugging from the console.
-	window.synapse = { model, view, hud, sceneManager, tour };
+	window.synapse = { model, view, hud, sceneManager, tour, inspector };
 }
 
 if (document.readyState === "loading") {

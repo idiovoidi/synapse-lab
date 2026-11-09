@@ -255,7 +255,7 @@ kbd {
 	bottom: calc(var(--gap) * 2 + var(--dock-h));
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 10px;
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	scrollbar-width: thin;
@@ -276,6 +276,68 @@ kbd {
 	width: var(--panel-right-w);
 }
 
+/* Control-panel tabs ------------------------------------------------------- */
+.tabs {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	flex: none;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 3px;
+	padding: 4px;
+	border-radius: var(--radius-lg);
+	background: var(--panel);
+	border: 1px solid var(--line);
+	backdrop-filter: blur(16px) saturate(140%);
+	box-shadow: var(--shadow);
+}
+
+.tabs [role="tab"] {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	height: 32px;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: none;
+	color: var(--text-dim);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition:
+		background 0.2s,
+		color 0.2s;
+}
+
+.tabs [role="tab"]:hover {
+	color: var(--text);
+}
+
+.tabs [role="tab"][aria-selected="true"] {
+	color: var(--text);
+	background: color-mix(in srgb, var(--nt) 18%, transparent);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--nt) 40%, transparent) inset;
+}
+
+.tab-badge {
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 999px;
+	font-family: var(--mono);
+	font-size: 10.5px;
+	line-height: 18px;
+	color: #fff;
+	background: var(--danger);
+}
+
+.tab-badge[hidden],
+[role="tabpanel"][hidden] {
+	display: none;
+}
+
 .card {
 	flex: none;
 	padding: 14px;
@@ -291,7 +353,7 @@ kbd {
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
-	margin-bottom: 12px;
+	margin-bottom: 10px;
 }
 
 .card-head h2 {
@@ -403,8 +465,7 @@ kbd {
 	border-color: rgba(255, 209, 102, 0.4);
 }
 
-.panel-toggle,
-.btn-fire-mini {
+.panel-toggle {
 	display: none;
 }
 
@@ -979,6 +1040,42 @@ input:focus-visible ~ .switch-track {
 	text-decoration-color: rgba(124, 132, 166, 0.5);
 }
 
+.chronic {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--line);
+}
+
+.chronic-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.adaptations {
+	margin: 8px 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 11.5px;
+	color: var(--text-dim);
+}
+
+.adaptations li {
+	padding: 6px 8px;
+	border-radius: var(--radius-sm);
+	background: rgba(98, 200, 255, 0.07);
+	border-left: 2px solid var(--accent-2);
+}
+
+.adaptations li.is-muted {
+	color: var(--muted);
+	background: none;
+	border-left-color: var(--line-strong);
+}
+
 .drug-others {
 	margin-top: 8px;
 	font-size: 12px;
@@ -1042,7 +1139,7 @@ input:focus-visible ~ .switch-track {
 .chart {
 	display: block;
 	width: 100%;
-	height: 96px;
+	height: 80px;
 	border-radius: var(--radius-sm);
 	background: rgba(0, 0, 0, 0.22);
 	border: 1px solid var(--line);
@@ -1072,6 +1169,92 @@ input:focus-visible ~ .switch-track {
 	background: #fff;
 }
 
+.swatch-baseline {
+	height: 0;
+	border-top: 2px dashed var(--text-dim);
+	border-radius: 0;
+}
+
+.legend-item[hidden] {
+	display: none;
+}
+
+.card-head-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.btn-mini {
+	height: 24px;
+	padding: 0 8px;
+	font-size: 11.5px;
+	color: var(--text-dim);
+	background: var(--panel-raised);
+	border-color: var(--line);
+}
+
+.btn-mini:hover {
+	color: var(--text);
+	border-color: var(--line-strong);
+}
+
+.btn-mini[aria-pressed="true"] {
+	color: var(--text);
+	border-color: rgba(154, 139, 255, 0.45);
+	background: rgba(154, 139, 255, 0.16);
+}
+
+.compare {
+	margin-top: 10px;
+	padding: 8px 10px;
+	border-radius: var(--radius-sm);
+	border: 1px dashed var(--line-strong);
+}
+
+.compare[hidden] {
+	display: none;
+}
+
+.compare-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.compare-label {
+	color: var(--text-dim);
+}
+
+.compare-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 6px;
+	margin: 6px 0 0;
+}
+
+.compare-grid dt {
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.compare-grid dd {
+	margin: 0;
+	font-size: 11px;
+	color: var(--text-dim);
+}
+
+.compare-grid dd.is-up {
+	color: var(--excitatory);
+}
+
+.compare-grid dd.is-down {
+	color: var(--inhibitory);
+}
+
 .stats {
 	display: grid;
 	grid-template-columns: repeat(3, 1fr);
@@ -1080,7 +1263,7 @@ input:focus-visible ~ .switch-track {
 }
 
 .stats > div {
-	padding: 7px 9px;
+	padding: 5px 8px;
 	border-radius: var(--radius-sm);
 	background: var(--panel-raised);
 	border: 1px solid var(--line);
@@ -1095,7 +1278,7 @@ input:focus-visible ~ .switch-track {
 
 .stats dd {
 	margin: 2px 0 0;
-	font-size: 15px;
+	font-size: 14px;
 	font-weight: 600;
 }
 
@@ -1131,8 +1314,8 @@ input:focus-visible ~ .switch-track {
 }
 
 .face {
-	width: 88px;
-	height: 88px;
+	width: 72px;
+	height: 72px;
 }
 
 .mood-bars {
@@ -1203,7 +1386,7 @@ input:focus-visible ~ .switch-track {
 .ecg {
 	display: block;
 	width: 100%;
-	height: 58px;
+	height: 50px;
 	border-radius: var(--radius-sm);
 	background: rgba(0, 0, 0, 0.3);
 	border: 1px solid var(--line);
@@ -1299,6 +1482,38 @@ input:focus-visible ~ .switch-track {
 }
 
 /* Toasts ------------------------------------------------------------------ */
+/* 3D inspector tooltip */
+.inspect-tip {
+	position: fixed;
+	z-index: 35;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	max-width: 270px;
+	padding: 9px 11px;
+	border-radius: var(--radius-md);
+	background: rgba(12, 16, 34, 0.94);
+	border: 1px solid var(--line-strong);
+	box-shadow: var(--shadow);
+	font-size: 12px;
+	color: var(--text-dim);
+	pointer-events: none;
+}
+
+.inspect-tip[hidden] {
+	display: none;
+}
+
+.inspect-tip strong {
+	font-size: 13px;
+	color: var(--text);
+}
+
+.inspect-tip em {
+	font-style: normal;
+	color: var(--accent-2);
+}
+
 .toasts {
 	position: absolute;
 	top: calc(var(--gap) * 2 + var(--topbar-h));
@@ -1593,10 +1808,6 @@ input:focus-visible ~ .switch-track {
 	.dock-divider,
 	.dock-label {
 		display: none;
-	}
-
-	.btn-fire-mini {
-		display: inline-flex;
 	}
 
 	.dock-group {

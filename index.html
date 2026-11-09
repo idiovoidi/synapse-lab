@@ -63,7 +63,12 @@
 			</header>
 
 			<aside class="panel panel-left" id="panel-controls" aria-label="Controls">
-				<section class="card" data-tour="transmitters">
+				<div class="tabs" role="tablist" aria-label="Control sections">
+					<button type="button" role="tab" id="tab-synapse" aria-controls="tabpanel-synapse" aria-selected="true" data-tab="synapse">Synapse</button>
+					<button type="button" role="tab" id="tab-stimulate" aria-controls="tabpanel-stimulate" aria-selected="false" tabindex="-1" data-tab="stimulate">Stimulate</button>
+					<button type="button" role="tab" id="tab-drugs" aria-controls="tabpanel-drugs" aria-selected="false" tabindex="-1" data-tab="drugs">Drugs <span class="tab-badge" id="drug-tab-badge" hidden>0</span></button>
+				</div>
+				<section class="card" data-tour="transmitters" role="tabpanel" id="tabpanel-synapse" aria-labelledby="tab-synapse">
 					<header class="card-head">
 						<h2>Neurotransmitter</h2>
 						<span class="hint">1 – 5</span>
@@ -72,7 +77,7 @@
 					<article class="nt-info" id="nt-info" aria-live="polite"></article>
 				</section>
 
-				<section class="card" data-tour="stimulate">
+				<section class="card" data-tour="stimulate" role="tabpanel" id="tabpanel-stimulate" aria-labelledby="tab-stimulate" hidden>
 					<header class="card-head">
 						<h2>Stimulate</h2>
 					</header>
@@ -123,7 +128,7 @@
 					</dl>
 				</section>
 
-				<section class="card" data-tour="pharmacology">
+				<section class="card" data-tour="pharmacology" role="tabpanel" id="tabpanel-drugs" aria-labelledby="tab-drugs" hidden>
 					<header class="card-head">
 						<h2>Pharmacology</h2>
 						<span class="hint" id="drug-count">none active</span>
@@ -134,6 +139,19 @@
 						<summary>Other drugs · little or no action here</summary>
 						<div class="drug-list" id="drug-list-other"></div>
 					</details>
+
+					<div class="chronic">
+						<div class="chronic-head">
+							<span class="field-label">Time on treatment</span>
+							<span class="badge badge-muted">Conceptual</span>
+						</div>
+						<div class="slider-row">
+							<input type="range" id="weeks-slider" min="0" max="8" step="1" value="0" aria-label="Weeks on the current drugs" />
+							<output id="weeks-out" class="mono">Acute</output>
+						</div>
+						<ul class="adaptations" id="adaptations"></ul>
+						<p class="caveat">Applies the steady-state adaptations that build over weeks of treatment. The simulation clock still runs in seconds.</p>
+					</div>
 				</section>
 			</aside>
 
@@ -141,7 +159,10 @@
 				<section class="card" data-tour="potential">
 					<header class="card-head">
 						<h2>Postsynaptic potential</h2>
-						<span class="badge" id="spike-badge">0 spikes</span>
+						<span class="card-head-actions">
+							<span class="badge" id="spike-badge">0 spikes</span>
+							<button type="button" class="btn btn-mini" id="pin-btn" aria-pressed="false" title="Pin the current 20 s of traces as a dashed baseline to compare against (B)">Pin baseline</button>
+						</span>
 					</header>
 					<div class="readout">
 						<span class="readout-value mono" id="voltage-out">−70.0</span>
@@ -157,6 +178,7 @@
 						<span class="legend">
 							<span class="legend-item"><i class="swatch" id="free-swatch"></i>Free</span>
 							<span class="legend-item"><i class="swatch swatch-occ"></i>Occupancy</span>
+							<span class="legend-item" id="baseline-legend" hidden><i class="swatch swatch-baseline"></i>Baseline</span>
 						</span>
 					</header>
 					<canvas class="chart" id="cleft-chart" aria-label="Free transmitter and receptor occupancy over the last 20 seconds"></canvas>
@@ -168,6 +190,17 @@
 						<div><dt>Diffused</dt><dd class="mono" data-stat="escaped">0</dd></div>
 						<div><dt>Failures</dt><dd class="mono" data-stat="failures">0</dd></div>
 					</dl>
+					<div class="compare" id="compare" hidden>
+						<div class="compare-head">
+							<span>Last 20 s vs baseline <span class="compare-label" id="baseline-label"></span></span>
+							<button type="button" class="btn btn-mini" id="clear-baseline-btn">Clear</button>
+						</div>
+						<dl class="compare-grid">
+							<div><dt>Mean free</dt><dd class="mono" data-compare="free"></dd></div>
+							<div><dt>Occupancy</dt><dd class="mono" data-compare="occupancy"></dd></div>
+							<div><dt>Spikes</dt><dd class="mono" data-compare="spikes"></dd></div>
+						</dl>
+					</div>
 				</section>
 
 				<section class="card card-body" data-tour="body">
@@ -175,7 +208,7 @@
 						<h2>Downstream effects</h2>
 						<span class="badge badge-muted">Illustrative</span>
 					</header>
-					<p class="caveat">A teaching analogy, not a clinical model. Real mood emerges from whole circuits over days to weeks, and heart rate is set by peripheral nerves.</p>
+					<p class="caveat" title="Real mood emerges from whole circuits over days to weeks, and heart rate is set by peripheral nerves.">Cartoons for teaching, not clinical models.</p>
 					<div class="card-body-split">
 					<div class="split-col">
 						<header class="card-head"><h2>Mood</h2></header>
@@ -231,6 +264,7 @@
 			</footer>
 
 			<div class="toasts" id="toasts" aria-live="polite"></div>
+			<div class="sr-only" id="sr-status" aria-live="polite"></div>
 			<div class="webgl-error" id="webgl-error" hidden>
 				<h2>3D view unavailable</h2>
 				<p>This simulation needs WebGL. Try a recent version of Chrome, Edge, Firefox or Safari with hardware acceleration enabled.</p>
@@ -252,6 +286,7 @@
 					<div><dt><kbd>L</kbd></dt><dd>Toggle labels</dd></div>
 					<div><dt><kbd>O</kbd></dt><dd>Toggle auto-orbit</dd></div>
 					<div><dt><kbd>V</kbd></dt><dd>Cycle camera views</dd></div>
+					<div><dt><kbd>B</kbd></dt><dd>Pin or clear the baseline traces</dd></div>
 					<div><dt><kbd>T</kbd></dt><dd>Start the guided tour</dd></div>
 					<div><dt><kbd>?</kbd></dt><dd>Show this panel</dd></div>
 				</dl>

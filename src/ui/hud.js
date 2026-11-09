@@ -7,7 +7,7 @@ import {
 } from "../config/drugs.js";
 import { NEUROTRANSMITTERS, NT_ORDER } from "../config/neurotransmitters.js";
 import { isExcitatory, RECEPTOR_TYPES } from "../config/receptors.js";
-import { MEMBRANE, PARTICLE } from "../config/synapse.js";
+import { HISTORY, MEMBRANE, PARTICLE } from "../config/synapse.js";
 import { CAMERA_PRESETS } from "../render/sceneManager.js";
 import { LineChart } from "./lineChart.js";
 
@@ -44,6 +44,7 @@ export class Hud {
 		this._bindTransmitters();
 		this._bindStimulation();
 		this._bindPharmacology();
+		this._bindTabs();
 		this._bindDock();
 		this._bindTopbar();
 		this._bindKeyboard();
@@ -123,6 +124,7 @@ export class Hud {
 			this._factsOpen = e.target.open;
 		});
 		if (this.drugCards) this._renderDrugs();
+		this.announce(`${nt.synapse} synapse selected`);
 		this.bus.emit("ui:transmitter", key);
 	}
 
@@ -184,6 +186,35 @@ export class Hud {
 	// Pharmacology
 	// ---------------------------------------------------------------------
 
+	_bindTabs() {
+		this.tabs = [...document.querySelectorAll('[role="tab"][data-tab]')];
+		for (const tab of this.tabs) {
+			tab.addEventListener("click", () => this.showTab(tab.dataset.tab));
+		}
+		$(".tabs").addEventListener("keydown", (e) => {
+			const dir = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+			if (!dir) return;
+			e.preventDefault();
+			const i = this.tabs.findIndex(
+				(t) => t.getAttribute("aria-selected") === "true",
+			);
+			const next = this.tabs[(i + dir + this.tabs.length) % this.tabs.length];
+			this.showTab(next.dataset.tab);
+			next.focus();
+		});
+	}
+
+	/** @param {"synapse" | "stimulate" | "drugs"} name */
+	showTab(name) {
+		for (const tab of this.tabs) {
+			const on = tab.dataset.tab === name;
+			tab.setAttribute("aria-selected", String(on));
+			tab.tabIndex = on ? 0 : -1;
+			document.getElementById(tab.getAttribute("aria-controls")).hidden = !on;
+		}
+		$("#panel-controls").scrollTop = 0;
+	}
+
 	_bindPharmacology() {
 		this.drugDoses = Object.fromEntries(
 			DRUG_ORDER.map((key) => [key, DRUGS[key].defaultDose]),
@@ -192,6 +223,13 @@ export class Hud {
 		for (const key of DRUG_ORDER)
 			this.drugCards[key] = this._buildDrugCard(key);
 		this.bus.on("drug:changed", () => this._renderDrugs());
+
+		const weeks = $("#weeks-slider");
+		weeks.addEventListener("input", () => {
+			this.model.setChronicWeeks(Number(weeks.value));
+			this._renderAdaptations();
+		});
+		setFill(weeks);
 	}
 
 	_buildDrugCard(key) {
@@ -225,6 +263,16 @@ export class Hud {
 		toggle.addEventListener("change", () => {
 			this.model.setDrug(key, toggle.checked ? this.drugDoses[key] : 0);
 			if (toggle.checked) this._explainDrug(key);
+			const targets = this.model
+				.drugTargets(key, this.drugDoses[key])
+				.filter((t) => t.present)
+				.map((t) => `${t.target} ${Math.round(t.occupancy * 100)}%`)
+				.join(", ");
+			this.announce(
+				toggle.checked
+					? `${DRUGS[key].name} on${targets ? `: ${targets}` : ", no target at this synapse"}`
+					: `${DRUGS[key].name} off`,
+			);
 		});
 		slider.addEventListener("input", () => {
 			this.drugDoses[key] = Number(slider.value);
@@ -280,6 +328,30 @@ export class Hud {
 			$("#drug-count"),
 			active === 0 ? "none active" : `${active} active`,
 		);
+		this._renderAdaptations();
+		const badge = $("#drug-tab-badge");
+		badge.hidden = active === 0;
+		setText(badge, String(active));
+	}
+
+	_renderAdaptations() {
+		const weeks = this.model.settings.chronicWeeks;
+		const slider = $("#weeks-slider");
+		setFill(slider);
+		setText($("#weeks-out"), weeks === 0 ? "Acute" : `${weeks} wk`);
+		const notes = this.model.adaptations.notes;
+		const list = $("#adaptations");
+		let html;
+		if (weeks === 0) {
+			html =
+				'<li class="is-muted">Acute: no adaptation yet. Slide to see what weeks of treatment change.</li>';
+		} else if (notes.length === 0) {
+			html =
+				'<li class="is-muted">No adaptations at this synapse with the current drugs.</li>';
+		} else {
+			html = notes.map((n) => `<li>${n}</li>`).join("");
+		}
+		if (list.innerHTML !== html) list.innerHTML = html;
 	}
 
 	_explainDrug(key) {
@@ -453,6 +525,9 @@ export class Hud {
 				case "t":
 					this.bus.emit("ui:tour");
 					break;
+				case "b":
+					this.toggleBaseline();
+					break;
 				case "?":
 					this.shortcutsDialog.showModal();
 					break;
@@ -504,9 +579,18 @@ export class Hud {
 		const getHead = () => hist().head;
 		const ntColor = () =>
 			NEUROTRANSMITTERS[this.model.settings.transmitter].color;
+		const seconds = HISTORY.length * HISTORY.sampleInterval;
+		const signed = (v) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
+		this.baseline = null;
 
 		this.voltageChart = new LineChart($("#voltage-chart"), {
 			getHead,
+			seconds,
+			getBaseline: () =>
+				this.baseline && {
+					data: [this.baseline.voltage],
+					head: this.baseline.head,
+				},
 			series: [
 				{
 					data: () => hist().voltage,
@@ -514,6 +598,12 @@ export class Hud {
 					min: -90,
 					max: MEMBRANE.peak + 5,
 					fill: true,
+					axis: {
+						side: "left",
+						ticks: [-80, -40, 0, 30],
+						format: signed,
+						unit: "mV",
+					},
 				},
 			],
 			guides: [
@@ -536,6 +626,12 @@ export class Hud {
 		this._freeMax = 40;
 		this.cleftChart = new LineChart($("#cleft-chart"), {
 			getHead,
+			seconds,
+			getBaseline: () =>
+				this.baseline && {
+					data: [this.baseline.free, this.baseline.occupancy],
+					head: this.baseline.head,
+				},
 			series: [
 				{
 					data: () => hist().free,
@@ -543,6 +639,12 @@ export class Hud {
 					min: 0,
 					max: () => this._freeMax,
 					fill: true,
+					axis: {
+						side: "left",
+						ticks: () => niceTicks(this._freeMax),
+						format: (v) => String(v),
+						unit: "mol.",
+					},
 				},
 				{
 					data: () => hist().occupancy,
@@ -550,6 +652,11 @@ export class Hud {
 					min: 0,
 					max: 1.05,
 					width: 1.3,
+					axis: {
+						side: "right",
+						ticks: [0, 0.5, 1],
+						format: (v) => `${Math.round(v * 100)}%`,
+					},
 				},
 			],
 		});
@@ -557,6 +664,78 @@ export class Hud {
 		this.voltageOut = $("#voltage-out");
 		this.voltageTag = $("#voltage-tag");
 		this.spikeBadge = $("#spike-badge");
+
+		this.pinBtn = $("#pin-btn");
+		this.pinBtn.addEventListener("click", () => this.toggleBaseline());
+		$("#clear-baseline-btn").addEventListener("click", () =>
+			this.toggleBaseline(false),
+		);
+	}
+
+	/**
+	 * Pin the current 20-second window as a dashed baseline, or clear it.
+	 * @param {boolean} [force]
+	 */
+	toggleBaseline(force) {
+		const pin = force ?? !this.baseline;
+		if (pin) {
+			const h = this.model.history;
+			const drugs = Object.keys(this.model.drugs).map((k) => DRUGS[k].name);
+			this.baseline = {
+				free: h.free.slice(),
+				occupancy: h.occupancy.slice(),
+				voltage: h.voltage.slice(),
+				head: h.head,
+				label: `${this.model.transmitter.short}${drugs.length ? ` + ${drugs.join(", ")}` : ", no drugs"}`,
+			};
+			this.baseline.summary = summarise(this.baseline);
+		} else {
+			this.baseline = null;
+		}
+		const on = Boolean(this.baseline);
+		this.pinBtn.setAttribute("aria-pressed", String(on));
+		this.pinBtn.textContent = on ? "Re-pin" : "Pin baseline";
+		$("#compare").hidden = !on;
+		$("#baseline-legend").hidden = !on;
+		if (on) setText($("#baseline-label"), `(${this.baseline.label})`);
+		this.announce(
+			on ? `Baseline pinned: ${this.baseline.label}` : "Baseline cleared",
+		);
+	}
+
+	/** Write a message to the screen-reader live region. */
+	announce(message) {
+		const el = $("#sr-status");
+		if (!el) return;
+		el.textContent = "";
+		requestAnimationFrame(() => {
+			el.textContent = message;
+		});
+	}
+
+	_updateCompare() {
+		if (!this.baseline) return;
+		const now = summarise(this.model.history);
+		const base = this.baseline.summary;
+		const rows = {
+			free: [now.free, base.free, (v) => v.toFixed(1)],
+			occupancy: [
+				now.occupancy,
+				base.occupancy,
+				(v) => `${Math.round(v * 100)}%`,
+			],
+			spikes: [now.spikes, base.spikes, (v) => String(v)],
+		};
+		for (const el of document.querySelectorAll("[data-compare]")) {
+			const [cur, ref, fmt] = rows[el.dataset.compare];
+			const delta = ref === 0 ? (cur === 0 ? 0 : Infinity) : (cur - ref) / ref;
+			const deltaText = !Number.isFinite(delta)
+				? "new"
+				: `${delta >= 0 ? "+" : "−"}${Math.abs(Math.round(delta * 100))}%`;
+			setText(el, `${fmt(cur)} (${fmt(ref)}, ${deltaText})`);
+			el.classList.toggle("is-up", delta > 0.1);
+			el.classList.toggle("is-down", delta < -0.1);
+		}
 	}
 
 	/** Refresh text readouts and charts. Called once per frame. */
@@ -623,6 +802,21 @@ export class Hud {
 
 		this.voltageChart.draw();
 		this.cleftChart.draw();
+
+		// Comparison and chart descriptions don't need per-frame updates.
+		if (now - (this._lastSummary ?? 0) > 500) {
+			this._lastSummary = now;
+			this._updateCompare();
+			const s = summarise(m.history);
+			$("#voltage-chart").setAttribute(
+				"aria-label",
+				`Membrane potential, last 20 seconds: now ${Math.round(m.voltage)} mV, ${s.spikes} spikes.`,
+			);
+			$("#cleft-chart").setAttribute(
+				"aria-label",
+				`Synaptic cleft, last 20 seconds: ${m.freeCount} free molecules now, mean ${s.free.toFixed(1)}; receptor occupancy ${Math.round(m.occupancy * 100)}%.`,
+			);
+		}
 	}
 }
 
@@ -635,6 +829,28 @@ function receptorTag(key, fraction) {
 	const polarity = isExcitatory(type) ? "excitatory" : "inhibitory";
 	const kind = type.kind === "ionotropic" ? "channel" : "GPCR";
 	return `<span class="tag tag-${polarity}" title="${polarity} ${kind}">${type.name} · ${Math.round(fraction * 100)}% · ${kind}</span>`;
+}
+
+/** Ticks for a 0–max axis: 0, a round middle value, and a round top value. */
+function niceTicks(max) {
+	const raw = max / 2;
+	const mag = 10 ** Math.floor(Math.log10(raw));
+	const step =
+		[1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw * 0.8) ?? raw;
+	return [0, step, step * 2].filter((v) => v <= max);
+}
+
+/** Window summary used for baseline comparison and chart descriptions. */
+function summarise({ free, occupancy, voltage }) {
+	let f = 0;
+	let o = 0;
+	let spikes = 0;
+	for (let i = 0; i < free.length; i++) {
+		f += free[i];
+		o += occupancy[i];
+		if (voltage[i] >= MEMBRANE.peak) spikes++;
+	}
+	return { free: f / free.length, occupancy: o / occupancy.length, spikes };
 }
 
 /** Write text only when it changed, to avoid needless layout work. */

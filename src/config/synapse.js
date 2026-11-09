@@ -80,6 +80,21 @@ export const PHARMACOLOGY = {
 	substrateCompetition: 0.6,
 };
 
+/**
+ * Chronic adaptations (conceptual steady states reached over weeks).
+ * Each scales with drug occupancy and with weeks / onsetWeeks (capped at 1).
+ */
+export const CHRONIC = {
+	onsetWeeks: 4,
+	maxWeeks: 8,
+	/** Autoreceptor desensitisation under sustained reuptake block (SSRIs, NRIs). */
+	autoreceptorDesensitisation: 0.7,
+	/** Receptor up-regulation under sustained antagonism (e.g. D2 with antipsychotics). */
+	upregulation: 0.5,
+	/** Loss of benzodiazepine effect (tolerance). */
+	pamTolerance: 0.5,
+};
+
 /** Probabilistic vesicle release. */
 export const RELEASE = {
 	/** Docking sites at the active zone (readily releasable pool). */
@@ -94,12 +109,12 @@ export const RELEASE = {
  * mitochondrial MAO.
  */
 export const CYTOSOL = {
-	synthesis: 8,
-	capacity: 150,
+	synthesis: 25,
+	capacity: 400,
 	/** MAO breakdown rate (1/s) for monoamines. */
 	mao: 0.15,
 	/** Exponent linking cytosolic level to vesicle fill. */
-	fillExponent: 0.6,
+	fillExponent: 0.25,
 	minFill: 3,
 	maxFill: 20,
 };

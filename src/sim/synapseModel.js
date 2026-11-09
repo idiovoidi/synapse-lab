@@ -8,6 +8,7 @@ import {
 import {
 	ACTION_POTENTIAL,
 	AUTORECEPTORS,
+	CHRONIC,
 	CLEFT,
 	CYTOSOL,
 	ENZYMES,
@@ -50,6 +51,8 @@ export class SynapseModel {
 			releaseProbability: RELEASE.probability,
 			autoFire: false,
 			fireRate: 1.5,
+			/** Weeks on the current drugs (0 = acute). Conceptual steady state. */
+			chronicWeeks: 0,
 		};
 
 		/** Active drugs: key → relative dose. */
@@ -146,6 +149,7 @@ export class SynapseModel {
 		// A different transmitter means a different synapse (Dale's principle):
 		// vesicles are refilled and the receptor and transporter mix changes.
 		this._configureSynapse();
+		this._recomputeAdaptations();
 		this.cytosol = this.cytosolSetpoint;
 		for (const v of this.vesicles) {
 			if (v.state === "ready") {
@@ -318,7 +322,10 @@ export class SynapseModel {
 	get effectiveReleaseProbability() {
 		return (
 			this.settings.releaseProbability *
-			(1 - AUTORECEPTORS.brake * this.autoBrake)
+			(1 -
+				AUTORECEPTORS.brake *
+					this.autoBrake *
+					this.adaptations.autoreceptorSensitivity)
 		);
 	}
 
@@ -377,6 +384,78 @@ export class SynapseModel {
 				effects.antagonistDrug[target] = firstDrug[id];
 		}
 		this.effects = effects;
+		this._recomputeAdaptations();
+	}
+
+	/**
+	 * Steady-state adaptations to sustained drug exposure. These normally
+	 * take weeks; here they are applied directly so their consequences can be
+	 * explored, while the simulation clock still runs in seconds.
+	 */
+	_recomputeAdaptations() {
+		const progress = Math.min(
+			1,
+			this.settings.chronicWeeks / CHRONIC.onsetWeeks,
+		);
+		const nt = this.transmitter;
+		const notes = [];
+
+		// Sustained reuptake block keeps autoreceptors stimulated, and they
+		// desensitise (the classic explanation for the SSRI delay).
+		const block = this.effects.transporterBlock[nt.transporter] || 0;
+		const desensitised = CHRONIC.autoreceptorDesensitisation * block * progress;
+		if (desensitised > 0.01) {
+			notes.push(
+				`${RECEPTOR_TYPES[nt.autoreceptor].name} autoreceptors desensitised ${Math.round(desensitised * 100)}%: release recovers despite ${nt.transporter} block`,
+			);
+		}
+
+		// Sustained antagonism up-regulates the blocked receptor.
+		const upregulation = {};
+		for (const [key, occ] of Object.entries(this.effects.antagonist)) {
+			const gain = 1 + CHRONIC.upregulation * occ * progress;
+			upregulation[key] = gain;
+			const here =
+				nt.postsynaptic.some(([k]) => k === key) || nt.autoreceptor === key;
+			if (here && gain > 1.01) {
+				notes.push(
+					`${RECEPTOR_TYPES[key].name} receptors up-regulated +${Math.round((gain - 1) * 100)}% (supersensitivity once the drug is reduced)`,
+				);
+			}
+		}
+
+		// Benzodiazepine tolerance.
+		const anyPam = Object.values(this.effects.pam).some((v) => v > 0);
+		const tolerance = anyPam ? CHRONIC.pamTolerance * progress : 0;
+		if (
+			tolerance > 0.01 &&
+			nt.postsynaptic.some(([k]) => k in this.effects.pam)
+		) {
+			notes.push(
+				`GABA-A tolerance: benzodiazepine effect −${Math.round(tolerance * 100)}%`,
+			);
+		}
+
+		this.adaptations = {
+			autoreceptorSensitivity: 1 - desensitised,
+			upregulation,
+			pamTolerance: tolerance,
+			notes,
+		};
+	}
+
+	/** @param {number} weeks */
+	setChronicWeeks(weeks) {
+		this.settings.chronicWeeks = Math.max(0, Math.min(CHRONIC.maxWeeks, weeks));
+		this._recomputeAdaptations();
+		this.emit("chronic:changed", { weeks: this.settings.chronicWeeks });
+	}
+
+	/** Benzodiazepine-style potentiation after tolerance. */
+	_pam(typeKey) {
+		return (
+			(this.effects.pam[typeKey] || 0) * (1 - this.adaptations.pamTolerance)
+		);
 	}
 
 	_receptorSlot(side, x, y, z, id) {
@@ -927,7 +1006,7 @@ export class SynapseModel {
 		p.y = best.y;
 		p.z = best.z;
 		// Benzodiazepine-like modulators keep the channel open longer.
-		const pam = this.effects.pam[best.type.key] || 0;
+		const pam = this._pam(best.type.key);
 		const dwell = best.type.dwell * (1 + PHARMACOLOGY.pamDwell * pam);
 		p.unbindAt = this.time + this.rng.exponential(dwell);
 		best.particle = p;
@@ -1059,12 +1138,14 @@ export class SynapseModel {
 			if (!r.particle) continue;
 			const type = r.type;
 			if (type.kind === "metabotropic") {
-				drive[type.effector] += type.gain;
+				drive[type.effector] +=
+					type.gain * (this.adaptations.upregulation[type.key] ?? 1);
 				continue;
 			}
 			let g = MEMBRANE.conductance * type.gain;
 			if (type.mgBlock) g *= nmdaUnblocked(v);
-			g *= 1 + PHARMACOLOGY.pamConductance * (this.effects.pam[type.key] || 0);
+			g *= 1 + PHARMACOLOGY.pamConductance * this._pam(type.key);
+			g *= this.adaptations.upregulation[type.key] ?? 1;
 			g *= 1 - (this.effects.channelBlock[type.key] || 0);
 			if (type.effector === "cation") gCation += g;
 			else gChloride += g;

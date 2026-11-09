@@ -76,6 +76,7 @@ const STEPS = [
 		body: [
 			"At this serotonergic synapse, turn on fluoxetine (Prozac). It blocks only SERT, so serotonin stays in the cleft longer and receptors stay busy.",
 			"Then try it at a dopamine synapse: no effect. Selectivity is what separates an SSRI from cocaine.",
+			"Acutely, autoreceptors partly cancel the rise. Drag 'Time on treatment' to see them desensitise over weeks, one explanation for the delayed benefit.",
 		],
 		target: "pharmacology",
 		transmitter: "SEROTONIN",
@@ -192,6 +193,9 @@ export class Tour {
 		// On narrow screens, open the drawer that holds the target.
 		const target =
 			step.target && document.querySelector(`[data-tour="${step.target}"]`);
+		// Open the tab that holds the target.
+		const tabpanel = target?.closest('[role="tabpanel"]');
+		if (tabpanel) this.hud.showTab(tabpanel.id.replace("tabpanel-", ""));
 		const panel = target?.closest(".panel");
 		if (panel) this.hud.togglePanel(panel.id.replace("panel-", ""), true);
 		else this.hud.togglePanel("controls", false);
