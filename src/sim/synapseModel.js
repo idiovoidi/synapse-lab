@@ -6,7 +6,9 @@ import {
 } from "../config/receptors.js";
 import {
 	ACTION_POTENTIAL,
+	AUTORECEPTORS,
 	CLEFT,
+	CYTOSOL,
 	ENZYMES,
 	FIRING_RATE_TAU,
 	HISTORY,
@@ -14,6 +16,7 @@ import {
 	MESSENGER,
 	PARTICLE,
 	RECEPTORS,
+	RELEASE,
 	TONE,
 	TRANSPORTERS,
 	VESICLES,
@@ -42,7 +45,7 @@ export class SynapseModel {
 
 		this.settings = {
 			transmitter: "GLUTAMATE",
-			vesiclesPerSpike: ACTION_POTENTIAL.defaultVesicles,
+			releaseProbability: RELEASE.probability,
 			reuptakeBlocked: false,
 			enzymesBlocked: false,
 			antagonist: false,
@@ -51,10 +54,12 @@ export class SynapseModel {
 		};
 
 		this.receptors = this._createReceptors();
-		this._assignReceptorTypes();
+		this.autoreceptors = this._createAutoreceptors();
+		this._allReceptors = [...this.receptors, ...this.autoreceptors];
 		this.transporters = this._createTransporters();
 		this.enzymes = this._createEnzymes();
 		this.vesicles = this._createVesicles();
+		this._configureSynapse();
 
 		this.reset();
 	}
@@ -81,28 +86,40 @@ export class SynapseModel {
 		this.conductance = { excitatory: 0, inhibitory: 0 };
 		/** Smoothed postsynaptic firing rate (spikes/s). */
 		this.firingRate = 0;
+		/** Smoothed autoreceptor (Gi) activation, 0–1. */
+		this.autoBrake = 0;
+
+		this.cytosol = this.cytosolSetpoint;
+		/** Smoothed MAO breakdown rate (molecules/s). */
+		this.maoActivity = 0;
+		this._maoAccumulator = 0;
 
 		this.tone = Object.fromEntries(NT_ORDER.map((k) => [k, 0]));
 		this.stats = {
 			actionPotentials: 0,
+			fusions: 0,
 			released: 0,
 			bindings: 0,
 			reuptaken: 0,
 			degraded: 0,
+			metabolised: 0,
 			escaped: 0,
 			spikes: 0,
 			failures: 0,
 			injected: 0,
 		};
 
-		for (const r of this.receptors) {
+		for (const r of this._allReceptors) {
 			r.particle = null;
 			r.activation = 0;
 			r.refractoryUntil = 0;
 		}
 		for (const t of this.transporters) t.flash = 0;
 		for (const e of this.enzymes) e.flash = 0;
-		for (const v of this.vesicles) this._restoreVesicle(v);
+		for (const v of this.vesicles) {
+			this._placeVesicle(v);
+			v.content = VESICLES.transmittersPerVesicle;
+		}
 		this._applyAntagonist();
 
 		this.history = {
@@ -120,11 +137,15 @@ export class SynapseModel {
 		if (!NEUROTRANSMITTERS[key] || key === this.settings.transmitter) return;
 		this.settings.transmitter = key;
 		// A different transmitter means a different synapse (Dale's principle):
-		// vesicles are refilled and the postsynaptic receptor mix changes.
+		// vesicles are refilled and the receptor and transporter mix changes.
+		this._configureSynapse();
+		this.cytosol = this.cytosolSetpoint;
 		for (const v of this.vesicles) {
-			if (v.state === "ready") v.type = key;
+			if (v.state === "ready") {
+				v.type = key;
+				v.content = VESICLES.transmittersPerVesicle;
+			}
 		}
-		this._assignReceptorTypes();
 		this.emit("settings:changed", { transmitter: key });
 	}
 
@@ -144,9 +165,9 @@ export class SynapseModel {
 		this.settings.fireRate = Math.max(0.1, Math.min(8, hz));
 	}
 
-	/** @param {number} n */
-	setVesiclesPerSpike(n) {
-		this.settings.vesiclesPerSpike = Math.max(1, Math.min(8, Math.round(n)));
+	/** @param {number} p Per-vesicle fusion probability, 0–1. */
+	setReleaseProbability(p) {
+		this.settings.releaseProbability = Math.max(0.01, Math.min(1, p));
 	}
 
 	/**
@@ -184,12 +205,17 @@ export class SynapseModel {
 		for (let i = 0; i < steps; i++) this._tick(h);
 	}
 
+	get transmitter() {
+		return NEUROTRANSMITTERS[this.settings.transmitter];
+	}
+
 	get freeCount() {
 		let n = 0;
 		for (const p of this.particles) if (p.state === "free") n++;
 		return n;
 	}
 
+	/** Bound postsynaptic receptors. */
 	get boundCount() {
 		let n = 0;
 		for (const r of this.receptors) if (r.particle) n++;
@@ -213,9 +239,55 @@ export class SynapseModel {
 		return n;
 	}
 
+	/** Mean transmitter content of vesicles waiting to be released. */
+	get meanVesicleContent() {
+		let sum = 0;
+		let n = 0;
+		for (const v of this.vesicles) {
+			if (v.state !== "ready") continue;
+			sum += v.content;
+			n++;
+		}
+		return n === 0 ? 0 : sum / n;
+	}
+
+	/** Release probability after autoreceptor feedback. */
+	get effectiveReleaseProbability() {
+		return (
+			this.settings.releaseProbability *
+			(1 - AUTORECEPTORS.brake * this.autoBrake)
+		);
+	}
+
+	/** Steady-state cytosolic level for the current transmitter. */
+	get cytosolSetpoint() {
+		const s = CYTOSOL.synthesis;
+		if (!this.transmitter.mao) return CYTOSOL.capacity;
+		return s / (s / CYTOSOL.capacity + CYTOSOL.mao);
+	}
+
 	// ---------------------------------------------------------------------
 	// Fixtures
 	// ---------------------------------------------------------------------
+
+	_receptorSlot(side, x, y, z, id) {
+		return {
+			id,
+			side,
+			/** Stable random value that picks this slot's subtype. */
+			slot: this.rng.next(),
+			type: null,
+			x,
+			y,
+			z,
+			antagonistSlot: this.rng.next() < RECEPTORS.antagonistFraction,
+			blocked: false,
+			particle: null,
+			activation: 0,
+			refractoryUntil: 0,
+			lastType: null,
+		};
+	}
 
 	_createReceptors() {
 		const receptors = [];
@@ -225,52 +297,42 @@ export class SynapseModel {
 			for (let i = 0; i < ring.n; i++) {
 				const a = offset + (i / ring.n) * Math.PI * 2;
 				const jitter = ring.r === 0 ? 0 : (this.rng.next() - 0.5) * 0.12;
-				receptors.push({
-					id: id++,
-					/** Stable random value that picks this slot's subtype. */
-					slot: this.rng.next(),
-					type: null,
-					x: CLEFT.xPost,
-					y: Math.cos(a) * (ring.r + jitter),
-					z: Math.sin(a) * (ring.r + jitter),
-					antagonistSlot: this.rng.next() < RECEPTORS.antagonistFraction,
-					blocked: false,
-					particle: null,
-					activation: 0,
-					refractoryUntil: 0,
-					lastType: null,
-				});
+				const r = ring.r + jitter;
+				receptors.push(
+					this._receptorSlot(
+						"post",
+						CLEFT.xPost,
+						Math.cos(a) * r,
+						Math.sin(a) * r,
+						id++,
+					),
+				);
 			}
 		}
 		return receptors;
 	}
 
-	/** Give each postsynaptic slot a subtype from the current synapse recipe. */
-	_assignReceptorTypes() {
-		const mix = NEUROTRANSMITTERS[this.settings.transmitter].postsynaptic;
-		for (const r of this.receptors) {
-			let acc = 0;
-			let key = mix[mix.length - 1][0];
-			for (const [k, fraction] of mix) {
-				acc += fraction;
-				if (r.slot < acc) {
-					key = k;
-					break;
-				}
-			}
-			const type = RECEPTOR_TYPES[key];
-			if (r.particle && r.particle.type !== type.ligand)
-				this._unbind(r.particle);
-			r.type = type;
+	_createAutoreceptors() {
+		const list = [];
+		for (let i = 0; i < AUTORECEPTORS.n; i++) {
+			const a = ((i + 0.5) / AUTORECEPTORS.n) * Math.PI * 2;
+			list.push(
+				this._receptorSlot(
+					"pre",
+					CLEFT.xPre,
+					Math.cos(a) * AUTORECEPTORS.r,
+					Math.sin(a) * AUTORECEPTORS.r,
+					1000 + i,
+				),
+			);
 		}
+		return list;
 	}
 
 	_createTransporters() {
 		const list = [];
-		for (const [side, spec] of Object.entries({
-			pre: TRANSPORTERS.pre,
-			post: TRANSPORTERS.post,
-		})) {
+		for (const side of ["pre", "post"]) {
+			const spec = TRANSPORTERS[side];
 			const offset = side === "pre" ? 0 : Math.PI / spec.n;
 			for (let i = 0; i < spec.n; i++) {
 				const a = offset + (i / spec.n) * Math.PI * 2;
@@ -280,19 +342,34 @@ export class SynapseModel {
 					y: Math.cos(a) * spec.r,
 					z: Math.sin(a) * spec.r,
 					flash: 0,
+					active: true,
 				});
 			}
+		}
+		// Astrocyte transporters follow the glial arc behind the cleft.
+		const glia = TRANSPORTERS.glia;
+		for (let i = 0; i < glia.n; i++) {
+			const theta = -glia.arc / 2 + (glia.arc * i) / (glia.n - 1);
+			list.push({
+				side: "glia",
+				x: i % 2 === 0 ? -0.35 : 0.35,
+				y: Math.sin(theta) * glia.r,
+				z: -Math.cos(theta) * glia.r,
+				flash: 0,
+				active: true,
+			});
 		}
 		return list;
 	}
 
 	_createEnzymes() {
+		// COMT sits on glia and the postsynaptic side, outside the cleft proper.
 		const list = [];
 		for (let i = 0; i < ENZYMES.count; i++) {
 			const a = (i / ENZYMES.count) * Math.PI * 2 + this.rng.next() * 0.4;
-			const r = 1.45 + this.rng.next() * 0.9;
+			const r = 2.55 + this.rng.next() * 0.6;
 			const home = {
-				x: (this.rng.next() - 0.5) * 1.1,
+				x: 0.15 + this.rng.next() * 0.8,
 				y: Math.cos(a) * r,
 				z: Math.sin(a) * r,
 			};
@@ -328,13 +405,35 @@ export class SynapseModel {
 					minGap * minGap,
 			);
 			if (!clash) {
-				list.push({ id: list.length, home, x: 0, y: 0, z: 0 });
+				list.push({ id: list.length, home, x: 0, y: 0, z: 0, content: 0 });
 			}
 		}
 		return list;
 	}
 
-	_restoreVesicle(v) {
+	/** Apply the current synapse recipe to receptors and transporters. */
+	_configureSynapse() {
+		const nt = this.transmitter;
+		for (const r of this.receptors) {
+			this._setReceptorType(r, pickFromMix(nt.postsynaptic, r.slot));
+		}
+		for (const r of this.autoreceptors) {
+			this._setReceptorType(r, nt.autoreceptor);
+		}
+		for (const t of this.transporters) {
+			// Monoamine transporters are presynaptic; amino-acid synapses also
+			// use postsynaptic and astrocyte transporters.
+			t.active = t.side === "pre" || nt.aminoAcid;
+		}
+	}
+
+	_setReceptorType(r, key) {
+		const type = RECEPTOR_TYPES[key];
+		if (r.particle && r.particle.type !== type.ligand) this._unbind(r.particle);
+		r.type = type;
+	}
+
+	_placeVesicle(v) {
 		v.state = "ready";
 		v.t = 0;
 		v.x = v.home.x;
@@ -343,6 +442,22 @@ export class SynapseModel {
 		v.scale = 1;
 		v.appear = 1;
 		v.type = this.settings.transmitter;
+	}
+
+	/**
+	 * Fill a recycled vesicle from the cytosolic pool. Fill scales with the
+	 * cytosolic level, so MAO inhibition (more cytosolic transmitter) makes
+	 * bigger quanta, and heavy use without reuptake makes smaller ones.
+	 */
+	_fillVesicle(v) {
+		const ratio = Math.max(0, this.cytosol / this.cytosolSetpoint);
+		const wanted = Math.round(
+			VESICLES.transmittersPerVesicle * ratio ** CYTOSOL.fillExponent,
+		);
+		const target = Math.max(CYTOSOL.minFill, Math.min(CYTOSOL.maxFill, wanted));
+		const taken = Math.min(target, Math.floor(this.cytosol));
+		this.cytosol -= taken;
+		v.content = taken;
 	}
 
 	_applyAntagonist() {
@@ -376,23 +491,31 @@ export class SynapseModel {
 	_onApArrival() {
 		this.calciumPulses.push({ start: this.time });
 		this.emit("ap:arrived");
-		this._schedule(ACTION_POTENTIAL.calciumDelay, () => this._dockVesicles());
+		this._schedule(ACTION_POTENTIAL.calciumDelay, () =>
+			this._releaseVesicles(),
+		);
 	}
 
-	_dockVesicles() {
-		// Vesicles closest to the active zone fuse first.
-		const ready = this.vesicles
+	/**
+	 * Each vesicle at a docking site fuses independently with the release
+	 * probability, reduced by autoreceptor feedback.
+	 */
+	_releaseVesicles() {
+		const candidates = this.vesicles
 			.filter((v) => v.state === "ready")
 			.sort((a, b) => b.home.x - a.home.x)
-			.slice(0, this.settings.vesiclesPerSpike);
+			.slice(0, RELEASE.sites);
+		const p = this.effectiveReleaseProbability;
+		const fusing = candidates.filter(() => this.rng.next() < p);
 
-		if (ready.length === 0) {
+		if (fusing.length === 0) {
 			this.stats.failures++;
-			this.emit("release:failed");
+			this.emit("release:failed", { depleted: candidates.length === 0 });
 			return;
 		}
 
-		for (const v of ready) {
+		this.stats.fusions += fusing.length;
+		for (const v of fusing) {
 			const a = this.rng.next() * Math.PI * 2;
 			const r = Math.sqrt(this.rng.next()) * 1.55;
 			v.state = "docking";
@@ -414,10 +537,12 @@ export class SynapseModel {
 		this.time += h;
 		this._runScheduled();
 		this._updateAutoFire(h);
+		this._updateCytosol(h);
 		this._updateVesicles(h);
 		this._updateEnzymes(h);
 		this._updateParticles(h);
 		this._updateReceptors(h);
+		this._updateAutoreceptorBrake(h);
 		this._updateMembrane(h);
 		this._updateTone(h);
 		this._updateTransients(h);
@@ -431,6 +556,26 @@ export class SynapseModel {
 			this._autoPhase -= 1;
 			this.fireActionPotential();
 		}
+	}
+
+	_updateCytosol(h) {
+		// Synthesis slows as the store fills (end-product inhibition).
+		this.cytosol +=
+			CYTOSOL.synthesis * (1 - this.cytosol / CYTOSOL.capacity) * h;
+
+		let maoRate = 0;
+		if (this.transmitter.mao && !this.settings.enzymesBlocked) {
+			maoRate = CYTOSOL.mao * this.cytosol;
+			const broken = maoRate * h;
+			this.cytosol -= broken;
+			this._maoAccumulator += broken;
+			while (this._maoAccumulator >= 1) {
+				this._maoAccumulator -= 1;
+				this.stats.metabolised++;
+			}
+		}
+		this.maoActivity += (maoRate - this.maoActivity) * Math.min(1, h * 2);
+		this.cytosol = Math.max(0, this.cytosol);
 	}
 
 	_updateVesicles(h) {
@@ -463,7 +608,8 @@ export class SynapseModel {
 				case "recycling": {
 					v.t += h;
 					if (v.t >= VESICLES.refillTime) {
-						this._restoreVesicle(v);
+						this._placeVesicle(v);
+						this._fillVesicle(v);
 						v.appear = 0;
 					}
 					break;
@@ -493,9 +639,8 @@ export class SynapseModel {
 	}
 
 	_releaseContents(v) {
-		const n = VESICLES.transmittersPerVesicle;
 		let released = 0;
-		for (let i = 0; i < n; i++) {
+		for (let i = 0; i < v.content; i++) {
 			const a = this.rng.next() * Math.PI * 2;
 			const r = this.rng.next() * 0.22;
 			const y = v.y + Math.cos(a) * r;
@@ -503,6 +648,7 @@ export class SynapseModel {
 			if (!this._spawnParticle(v.type, y, z)) break;
 			released++;
 		}
+		v.content = 0;
 		this.stats.released += released;
 		this.emit("vesicle:fused", {
 			type: v.type,
@@ -541,6 +687,9 @@ export class SynapseModel {
 					if (p.t >= 1) {
 						remove = true;
 						this.stats.reuptaken++;
+						// Presynaptic reuptake refills the terminal directly; astrocytes
+						// return amino acids via the glutamate–glutamine cycle.
+						if (p.target.side !== "post") this.cytosol += 1;
 						this.emit("nt:cleared", { type: p.type, via: "reuptake" });
 					}
 					break;
@@ -573,9 +722,12 @@ export class SynapseModel {
 		if (radial < CLEFT.radius) {
 			const minX = CLEFT.xPre + PARTICLE.radius;
 			const maxX = CLEFT.xPost - PARTICLE.radius;
-			if (p.x < minX) p.x = 2 * minX - p.x;
+			if (p.x < minX) {
+				if (this._tryBind(p, this.autoreceptors)) return false;
+				p.x = 2 * minX - p.x;
+			}
 			if (p.x > maxX) {
-				if (this._tryBind(p)) return false;
+				if (this._tryBind(p, this.receptors)) return false;
 				p.x = 2 * maxX - p.x;
 			}
 		}
@@ -586,8 +738,7 @@ export class SynapseModel {
 			return true;
 		}
 
-		// Reuptake transporters sit on the periphery of both membranes and
-		// carry only this synapse's transmitter (DAT, SERT, EAAT…).
+		// Transporters carry only this synapse's transmitter (DAT, SERT, EAAT…).
 		if (
 			!this.settings.reuptakeBlocked &&
 			p.type === this.settings.transmitter &&
@@ -595,6 +746,7 @@ export class SynapseModel {
 		) {
 			const chance = 1 - Math.exp(-nt.reuptake * h);
 			for (const t of this.transporters) {
+				if (!t.active) continue;
 				if (dist2(p, t) < TRANSPORTERS.captureRadius ** 2) {
 					if (this.rng.next() < chance) {
 						p.state = "reuptake";
@@ -609,8 +761,8 @@ export class SynapseModel {
 			if (p.state !== "free") return false;
 		}
 
-		// Extracellular enzymes break down monoamines.
-		if (!this.settings.enzymesBlocked && nt.enzymatic > 0 && radial > 0.9) {
+		// COMT on glia and the postsynaptic side breaks down catecholamines.
+		if (!this.settings.enzymesBlocked && nt.enzymatic > 0 && radial > 2) {
 			const chance = 1 - Math.exp(-nt.enzymatic * h);
 			for (const e of this.enzymes) {
 				if (dist2(p, e) < ENZYMES.captureRadius ** 2) {
@@ -627,10 +779,14 @@ export class SynapseModel {
 		return false;
 	}
 
-	_tryBind(p) {
+	/**
+	 * @param {object} p Particle touching a membrane.
+	 * @param {object[]} list Receptors on that membrane.
+	 */
+	_tryBind(p, list) {
 		let best = null;
 		let bestD = RECEPTORS.captureRadius ** 2;
-		for (const r of this.receptors) {
+		for (const r of list) {
 			const d = (r.y - p.y) ** 2 + (r.z - p.z) ** 2;
 			if (d < bestD) {
 				bestD = d;
@@ -649,9 +805,10 @@ export class SynapseModel {
 			return false;
 		}
 
+		const inward = best.side === "pre" ? 1 : -1;
 		p.state = "bound";
 		p.receptor = best;
-		p.x = best.x - PARTICLE.radius * 2.6;
+		p.x = best.x + inward * PARTICLE.radius * 2.6;
 		p.y = best.y;
 		p.z = best.z;
 		p.unbindAt = this.time + this.rng.exponential(best.type.dwell);
@@ -661,6 +818,7 @@ export class SynapseModel {
 		this.emit("nt:bound", {
 			type: p.type,
 			receptor: best.type.key,
+			side: best.side,
 			polarity: isExcitatory(best.type) ? "excitatory" : "inhibitory",
 		});
 		return true;
@@ -674,15 +832,27 @@ export class SynapseModel {
 		}
 		p.receptor = null;
 		p.state = "free";
-		p.x = CLEFT.xPost - PARTICLE.radius * 3.5;
+		p.x =
+			r?.side === "pre"
+				? CLEFT.xPre + PARTICLE.radius * 3.5
+				: CLEFT.xPost - PARTICLE.radius * 3.5;
 	}
 
 	_updateReceptors(h) {
 		const k = Math.min(1, h * 12);
-		for (const r of this.receptors) {
+		for (const r of this._allReceptors) {
 			const target = r.particle ? 1 : 0;
 			r.activation += (target - r.activation) * k;
 		}
+	}
+
+	/** Gi-coupled autoreceptors throttle release with G-protein kinetics. */
+	_updateAutoreceptorBrake(h) {
+		let bound = 0;
+		for (const r of this.autoreceptors) if (r.particle) bound++;
+		const drive = bound / this.autoreceptors.length;
+		const tau = drive > this.autoBrake ? MESSENGER.rise : MESSENGER.decay;
+		this.autoBrake += ((drive - this.autoBrake) * h) / tau;
 	}
 
 	_updateMembrane(h) {
@@ -746,8 +916,9 @@ export class SynapseModel {
 	_updateTone(h) {
 		const counts = {};
 		for (const r of this.receptors) {
-			if (r.particle)
+			if (r.particle) {
 				counts[r.particle.type] = (counts[r.particle.type] || 0) + 1;
+			}
 		}
 		const k = h / TONE.tau;
 		for (const key of NT_ORDER) {
@@ -817,6 +988,16 @@ export function computeMood(tone, firingRate = 0) {
 export function computeHeartRate(tone, base = 68) {
 	const bpm = base + 48 * (tone.NOREPINEPHRINE || 0);
 	return Math.max(42, Math.min(170, bpm));
+}
+
+/** Pick a subtype from a receptor mix using a stable value in [0, 1). */
+function pickFromMix(mix, value) {
+	let acc = 0;
+	for (const [key, fraction] of mix) {
+		acc += fraction;
+		if (value < acc) return key;
+	}
+	return mix[mix.length - 1][0];
 }
 
 function lerp(a, b, t) {

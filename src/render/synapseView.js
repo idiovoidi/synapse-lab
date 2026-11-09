@@ -4,6 +4,7 @@ import { NEUROTRANSMITTERS } from "../config/neurotransmitters.js";
 import { isExcitatory } from "../config/receptors.js";
 import {
 	ACTION_POTENTIAL,
+	ASTROCYTE,
 	CLEFT,
 	PARTICLE,
 	VESICLES,
@@ -67,6 +68,7 @@ export class SynapseView {
 		this._buildAxon();
 		this._buildMembraneSpecialisations();
 		this._buildReceptors();
+		this._buildAstrocyte();
 		this._buildTransporters();
 		this._buildEnzymes();
 		this._buildVesicles();
@@ -158,7 +160,8 @@ export class SynapseView {
 		shaft.renderOrder = 2;
 		this.root.add(shaft);
 
-		// Mitochondria fuel vesicle cycling.
+		// Mitochondria fuel vesicle cycling; MAO on their outer membrane breaks
+		// down cytosolic monoamines, so they glow with MAO activity.
 		const mitoMaterial = new THREE.MeshStandardMaterial({
 			color: "#6d4fa8",
 			emissive: "#2c1a52",
@@ -186,6 +189,7 @@ export class SynapseView {
 			group.rotation.set(0.3, rot, Math.PI / 2 + rot);
 			this.root.add(group);
 		}
+		this.mitoMaterial = mitoMaterial;
 	}
 
 	_buildAxon() {
@@ -268,9 +272,31 @@ export class SynapseView {
 	}
 
 	_buildReceptors() {
-		this.receptorViews = this.model.receptors.map((r) =>
-			this._makeReceptorView(r, -1, 1),
+		this.receptorViews = [
+			...this.model.receptors.map((r) => this._makeReceptorView(r, -1, 1)),
+			// Presynaptic autoreceptors face the cleft from the other side.
+			...this.model.autoreceptors.map((r) => this._makeReceptorView(r, 1, 0.8)),
+		];
+	}
+
+	/** Astrocyte process wrapping the back of the cleft (tripartite synapse). */
+	_buildAstrocyte() {
+		const material = createMembraneMaterial({
+			color: "#0d2a20",
+			rim: "#59e3a7",
+			opacity: 0.75,
+		});
+		const mesh = new THREE.Mesh(
+			new THREE.TorusGeometry(ASTROCYTE.radius, 0.5, 20, 72, ASTROCYTE.arc),
+			material,
 		);
+		// Lay the ring in the YZ plane, then centre its arc behind the cleft.
+		mesh.rotation.y = Math.PI / 2;
+		mesh.renderOrder = 2;
+		const group = new THREE.Group();
+		group.rotation.x = -ASTROCYTE.arc / 2;
+		group.add(mesh);
+		this.root.add(group);
 	}
 
 	/**
@@ -344,12 +370,20 @@ export class SynapseView {
 			const group = new THREE.Group();
 			const body = new THREE.Mesh(bodyGeo, material);
 			const mouth = new THREE.Mesh(mouthGeo, material);
-			const inward = t.side === "pre" ? 1 : -1;
+			const inward = t.side === "post" ? -1 : 1;
 			mouth.position.x = 0.17 * inward;
 			group.add(body, mouth);
 			group.position.set(t.x, t.y, t.z);
+			if (t.side === "glia") {
+				// Point the pore radially inward, toward the cleft.
+				const toCleft = new THREE.Vector3(0, -t.y, -t.z).normalize();
+				group.quaternion.setFromUnitVectors(
+					new THREE.Vector3(1, 0, 0),
+					toCleft,
+				);
+			}
 			this.root.add(group);
-			return { model: t, material };
+			return { model: t, material, group };
 		});
 	}
 
@@ -397,7 +431,7 @@ export class SynapseView {
 			const core = new THREE.Mesh(coreGeo, coreMaterial);
 			group.add(core, shell);
 			this.root.add(group);
-			return { model: v, group, coreMaterial, type: null };
+			return { model: v, group, core, coreMaterial, type: null };
 		});
 	}
 
@@ -599,7 +633,10 @@ export class SynapseView {
 			["Synaptic cleft", [0, -3.15, 0]],
 			["Receptors", [1.25, 2.05, 0.6]],
 			["Reuptake transporters", [-1, 2.75, 0.4]],
-			["Enzymes", [0.1, 1.6, -2.3]],
+			["Autoreceptors", [-1.2, -1.95, -1.2]],
+			["Astrocyte", [0, 3.7, -1.6]],
+			["COMT (glia)", [0.6, -2.4, -2.2]],
+			["Mitochondria (MAO)", [-4.4, 1.75, -0.6]],
 			["Postsynaptic spine", [3.4, 3.0, 0]],
 			["Dendrite", [7.4, 1.9, 5]],
 		];
@@ -612,6 +649,9 @@ export class SynapseView {
 			this.root.add(label);
 			return label;
 		});
+		this.comtLabel = this.labels.find(
+			(l) => l.element.textContent === "COMT (glia)",
+		);
 	}
 
 	// ---------------------------------------------------------------------
@@ -637,6 +677,10 @@ export class SynapseView {
 			this._spineFlash * 0.45 + depol * 0.08;
 		this.psd.material.emissiveIntensity =
 			0.6 + depol * 0.6 + this._spineFlash * 0.6;
+
+		// Mitochondria glow with MAO activity (monoamine breakdown).
+		this.mitoMaterial.emissiveIntensity =
+			1 + Math.min(2.5, m.maoActivity * 0.4);
 
 		this.dust.rotation.y += dt * 0.01;
 	}
@@ -710,6 +754,11 @@ export class SynapseView {
 				view.type = v.type;
 				view.coreMaterial.color.copy(this._ntColors[v.type]);
 			}
+			// Core size tracks how full the vesicle is (quantal size).
+			const fill = Math.cbrt(
+				Math.max(0.15, v.content / VESICLES.transmittersPerVesicle),
+			);
+			view.core.scale.setScalar(Math.min(1.35, fill));
 			view.coreMaterial.opacity = v.state === "fusing" ? 1 : 0.8;
 		}
 	}
@@ -738,6 +787,8 @@ export class SynapseView {
 	_syncTransporters() {
 		const blocked = this.model.settings.reuptakeBlocked;
 		for (const view of this.transporterViews) {
+			view.group.visible = view.model.active;
+			if (!view.model.active) continue;
 			const flash = view.model.flash;
 			view.material.color.set(
 				blocked ? PALETTE.transporterBlocked : PALETTE.transporter,
@@ -749,7 +800,12 @@ export class SynapseView {
 
 	_syncEnzymes(dt) {
 		const blocked = this.model.settings.enzymesBlocked;
+		// COMT only matters for catecholamines (dopamine, norepinephrine).
+		const present = this.model.transmitter.enzymatic > 0;
+		this.comtLabel.visible = present;
 		for (const view of this.enzymeViews) {
+			view.mesh.visible = present;
+			if (!present) continue;
 			const e = view.model;
 			view.mesh.position.set(e.x, e.y, e.z);
 			view.mesh.rotation.y += dt * 0.6;

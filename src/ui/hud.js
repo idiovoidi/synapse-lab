@@ -142,18 +142,21 @@ export class Hud {
 		rate.addEventListener("input", syncRate);
 		syncRate();
 
-		const ves = $("#vesicle-slider");
-		const vesOut = $("#vesicle-out");
-		const syncVes = () => {
-			this.model.setVesiclesPerSpike(Number(ves.value));
-			vesOut.textContent = ves.value;
-			setFill(ves);
+		const pr = $("#release-slider");
+		const prOut = $("#release-out");
+		const syncPr = () => {
+			this.model.setReleaseProbability(Number(pr.value));
+			prOut.textContent = `${Math.round(Number(pr.value) * 100)}%`;
+			setFill(pr);
 		};
-		ves.addEventListener("input", syncVes);
-		syncVes();
+		pr.addEventListener("input", syncPr);
+		syncPr();
 
 		this.poolOut = $("#pool-out");
 		this.poolMeter = $("#pool-meter");
+		this.fillOut = $("#fill-out");
+		this.brakeOut = $("#brake-out");
+		this.cytosolOut = $("#cytosol-out");
 	}
 
 	fire() {
@@ -386,12 +389,19 @@ export class Hud {
 				throttle: 9000,
 			});
 		});
-		this.bus.on("release:failed", () => {
-			this.toaster.show("Release failed: the vesicle pool is depleted", {
-				color: "#ff5c7a",
-				key: "depleted",
-				throttle: 6000,
-			});
+		this.bus.on("release:failed", ({ depleted }) => {
+			if (depleted) {
+				this.toaster.show("Release failed: the vesicle pool is depleted", {
+					color: "#ff5c7a",
+					key: "depleted",
+					throttle: 6000,
+				});
+			} else {
+				this.toaster.show(
+					"No vesicle fused that time. Release is probabilistic, and autoreceptors lower the odds.",
+					{ color: "#9a8bff", key: "failure", throttle: 15000 },
+				);
+			}
 		});
 		this.bus.on("sim:reset", () => {
 			this._lastSpikeAt = 0;
@@ -501,6 +511,12 @@ export class Hud {
 		this.poolOut.textContent = `${ready} / ${total}`;
 		this.poolMeter.style.width = `${(ready / total) * 100}%`;
 		this.poolMeter.classList.toggle("is-low", ready / total < 0.25);
+		setText(this.fillOut, m.meanVesicleContent.toFixed(1));
+		setText(
+			this.brakeOut,
+			`${Math.round((1 - m.effectiveReleaseProbability / m.settings.releaseProbability) * 100)}%`,
+		);
+		setText(this.cytosolOut, String(Math.round(m.cytosol)));
 
 		// Free-transmitter axis expands to fit, then relaxes back.
 		let peak = 0;
@@ -522,6 +538,11 @@ function receptorTag(key, fraction) {
 	const polarity = isExcitatory(type) ? "excitatory" : "inhibitory";
 	const kind = type.kind === "ionotropic" ? "channel" : "GPCR";
 	return `<span class="tag tag-${polarity}" title="${polarity} ${kind}">${type.name} · ${Math.round(fraction * 100)}% · ${kind}</span>`;
+}
+
+/** Write text only when it changed, to avoid needless layout work. */
+function setText(el, text) {
+	if (el.textContent !== text) el.textContent = text;
 }
 
 /** @param {HTMLInputElement} input */

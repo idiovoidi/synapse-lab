@@ -799,6 +799,32 @@ input:focus-visible ~ .switch-track {
 	margin-top: 14px;
 }
 
+.presyn {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 6px;
+	margin: 10px 0 0;
+}
+
+.presyn > div {
+	padding: 6px 8px;
+	border-radius: var(--radius-sm);
+	background: var(--panel-raised);
+	border: 1px solid var(--line);
+}
+
+.presyn dt {
+	font-size: 10px;
+	line-height: 1.25;
+	color: var(--muted);
+}
+
+.presyn dd {
+	margin: 2px 0 0;
+	font-size: 13px;
+	font-weight: 600;
+}
+
 .pool-head {
 	display: flex;
 	justify-content: space-between;

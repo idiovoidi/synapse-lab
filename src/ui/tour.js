@@ -39,7 +39,7 @@ const STEPS = [
 	{
 		title: "Fire an action potential",
 		body: [
-			"An electrical spike runs down the axon. At the terminal, Ca²⁺ floods in (yellow sparks) and vesicles fuse with the membrane, spilling their contents.",
+			"An electrical spike runs down the axon. At the terminal, Ca²⁺ floods in (yellow sparks) and each docked vesicle fuses with some probability, spilling its contents. Sometimes none fuse at all.",
 		],
 		target: "stimulate",
 		view: "cleft",
@@ -65,7 +65,8 @@ const STEPS = [
 	{
 		title: "Cleaning up",
 		body: [
-			"The signal has to stop. Transporters (pale rings) pull transmitter back for reuse, enzymes (pink) break monoamines down, and some simply diffuse away.",
+			"The signal has to stop. Transporters (pale rings) pull transmitter back into the terminal or the green astrocyte. Inside the terminal, MAO on the mitochondria breaks down monoamines. Pink COMT enzymes on glia handle dopamine and norepinephrine that escape.",
+			"Autoreceptors on the presynaptic side sense released transmitter and turn down further release.",
 		],
 		target: "cleft",
 		view: "cleft",

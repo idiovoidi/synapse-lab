@@ -20,11 +20,14 @@
  * @property {string} role
  * @property {string} summary
  * @property {Array<[string, number]>} postsynaptic  Receptor subtype mix (fractions sum to 1).
+ * @property {string} autoreceptor Presynaptic autoreceptor subtype.
  * @property {string} transporter Plasma-membrane transporter that clears it.
+ * @property {boolean} aminoAcid  Amino-acid transmitter: cleared by neuronal and astrocyte transporters.
+ * @property {boolean} mao        Broken down by mitochondrial MAO inside cells.
  * @property {string} clearance
  * @property {number} diffusion   Relative diffusion coefficient.
  * @property {number} reuptake    Transporter capture rate (1/s near a transporter).
- * @property {number} enzymatic   Extracellular enzyme rate (1/s near an enzyme); 0 = none.
+ * @property {number} enzymatic   Extracellular COMT rate (1/s near an enzyme); 0 = not a substrate.
  * @property {{happiness:number, arousal:number, anxiety:number}} mood
  *   Illustrative contribution to the mood display (not a clinical model).
  */
@@ -44,8 +47,12 @@ export const NEUROTRANSMITTERS = {
 			["AMPA", 0.6],
 			["NMDA", 0.4],
 		],
+		autoreceptor: "MGLUR2",
+		aminoAcid: true,
+		mao: false,
 		transporter: "EAAT",
-		clearance: "EAAT transporters, mostly on astrocytes",
+		clearance:
+			"EAAT transporters, mostly on astrocytes (glutamate–glutamine cycle)",
 		diffusion: 1.15,
 		reuptake: 9,
 		enzymatic: 0,
@@ -61,6 +68,9 @@ export const NEUROTRANSMITTERS = {
 		summary:
 			"The brain's main fast inhibitory transmitter. GABA-A receptors open Cl⁻ channels that hold the membrane near −80 mV, making the cell harder to fire.",
 		postsynaptic: [["GABA_A", 1]],
+		autoreceptor: "GABA_B",
+		aminoAcid: true,
+		mao: false,
 		transporter: "GAT",
 		clearance: "GAT transporters on neurons and astrocytes",
 		diffusion: 1,
@@ -81,10 +91,13 @@ export const NEUROTRANSMITTERS = {
 			["D1", 0.5],
 			["D2", 0.5],
 		],
+		autoreceptor: "D2",
+		aminoAcid: false,
+		mao: true,
 		transporter: "DAT",
 		clearance: "DAT reuptake; broken down by MAO (inside cells) and COMT",
 		diffusion: 0.9,
-		reuptake: 7,
+		reuptake: 13,
 		enzymatic: 0.7,
 		mood: { happiness: 0.55, arousal: 0.3, anxiety: 0 },
 	},
@@ -101,11 +114,14 @@ export const NEUROTRANSMITTERS = {
 			["HT1A", 0.5],
 			["HT2A", 0.5],
 		],
+		autoreceptor: "HT1B",
+		aminoAcid: false,
+		mao: true,
 		transporter: "SERT",
-		clearance: "SERT reuptake; broken down by MAO inside cells",
+		clearance: "SERT reuptake, then MAO inside cells (not a COMT substrate)",
 		diffusion: 0.85,
-		reuptake: 6.5,
-		enzymatic: 0.6,
+		reuptake: 12,
+		enzymatic: 0,
 		mood: { happiness: 0.2, arousal: -0.15, anxiety: -0.35 },
 	},
 	NOREPINEPHRINE: {
@@ -122,10 +138,13 @@ export const NEUROTRANSMITTERS = {
 			["BETA1", 0.4],
 			["ALPHA2", 0.25],
 		],
+		autoreceptor: "ALPHA2",
+		aminoAcid: false,
+		mao: true,
 		transporter: "NET",
 		clearance: "NET reuptake; broken down by MAO (inside cells) and COMT",
 		diffusion: 1.05,
-		reuptake: 6.5,
+		reuptake: 12,
 		enzymatic: 0.7,
 		mood: { happiness: 0, arousal: 0.7, anxiety: 0.45 },
 	},

@@ -58,15 +58,18 @@ describe("SynapseModel", () => {
 		assert.equal(model.particles.length, 0, "cleft cleared");
 		const { reuptaken, degraded, escaped, released } = model.stats;
 		assert.equal(reuptaken + degraded + escaped, released);
-		assert.ok(degraded > 0, "monoamines are broken down by enzymes");
+		assert.ok(degraded > 0, "dopamine is broken down by COMT");
 	});
 
-	it("never degrades amino-acid transmitters enzymatically", () => {
-		const model = new SynapseModel({ seed: 4 });
-		fire(model, 3);
-		run(model, 30);
-		assert.equal(model.stats.degraded, 0);
-	});
+	for (const key of ["GLUTAMATE", "GABA", "SEROTONIN"]) {
+		it(`${key} is not broken down in the extracellular space`, () => {
+			const model = new SynapseModel({ seed: 4 });
+			model.setTransmitter(key);
+			fire(model, 3);
+			run(model, 30);
+			assert.equal(model.stats.degraded, 0);
+		});
+	}
 
 	it("fires the postsynaptic cell with glutamate but not GABA", () => {
 		const glu = new SynapseModel({ seed: 5 });
@@ -109,7 +112,7 @@ describe("SynapseModel", () => {
 
 	it("depletes the vesicle pool under rapid firing", () => {
 		const model = new SynapseModel({ seed: 8 });
-		model.setVesiclesPerSpike(6);
+		model.setReleaseProbability(0.95);
 		fire(model, 8, 0.15);
 		run(model, 1);
 		assert.ok(model.stats.failures > 0, "some spikes fail to release");
@@ -215,5 +218,70 @@ describe("metabotropic signalling", () => {
 		ne.injectTransmitter("NOREPINEPHRINE", 200);
 		run(ne, 2);
 		assert.ok(ne.voltage > MEMBRANE.rest + 2, `NE at ${ne.voltage}`);
+	});
+});
+
+describe("presynaptic machinery", () => {
+	it("release is probabilistic: some spikes fail at low Pr", () => {
+		const model = new SynapseModel({ seed: 20 });
+		model.setReleaseProbability(0.08);
+		fire(model, 20, 0.4);
+		assert.ok(model.stats.failures > 0);
+		assert.ok(model.stats.fusions > 0);
+		assert.ok(model.stats.fusions < 20 * 8 * 0.3);
+	});
+
+	it("autoreceptor activation lowers release per spike", () => {
+		const fusionsPerSpike = (preload) => {
+			let fusions = 0;
+			for (let seed = 30; seed < 36; seed++) {
+				const model = new SynapseModel({ seed });
+				model.setTransmitter("DOPAMINE");
+				for (let i = 0; i < 12; i++) {
+					if (preload) model.injectTransmitter("DOPAMINE", 80);
+					model.fireActionPotential();
+					run(model, 0.5);
+				}
+				fusions += model.stats.fusions;
+			}
+			return fusions / (6 * 12);
+		};
+		const quiet = fusionsPerSpike(false);
+		const braked = fusionsPerSpike(true);
+		assert.ok(braked < quiet * 0.8, `quiet ${quiet}, braked ${braked}`);
+	});
+
+	it("MAO drains the cytosol only at monoamine synapses", () => {
+		const da = new SynapseModel({ seed: 21 });
+		da.setTransmitter("DOPAMINE");
+		run(da, 5);
+		assert.ok(da.stats.metabolised > 0);
+
+		const glu = new SynapseModel({ seed: 21 });
+		run(glu, 5);
+		assert.equal(glu.stats.metabolised, 0);
+	});
+
+	it("reuptake refills vesicles; blocking it shrinks quanta under load", () => {
+		const content = (blocked) => {
+			const model = new SynapseModel({ seed: 22 });
+			model.setTransmitter("DOPAMINE");
+			model.setFlag("reuptakeBlocked", blocked);
+			model.setReleaseProbability(0.6);
+			fire(model, 30, 0.25);
+			run(model, 4);
+			return model.meanVesicleContent;
+		};
+		assert.ok(content(true) < content(false));
+	});
+
+	it("monoamine synapses use only presynaptic transporters", () => {
+		const model = new SynapseModel({ seed: 23 });
+		model.setTransmitter("SEROTONIN");
+		const active = model.transporters.filter((t) => t.active);
+		assert.ok(active.length > 0);
+		for (const t of active) assert.equal(t.side, "pre");
+		model.setTransmitter("GLUTAMATE");
+		assert.ok(model.transporters.some((t) => t.active && t.side === "glia"));
 	});
 });

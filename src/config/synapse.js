@@ -37,15 +37,58 @@ export const RECEPTORS = {
 	antagonistFraction: 0.7,
 };
 
+/** Presynaptic autoreceptors ring the active zone. */
+export const AUTORECEPTORS = {
+	r: 1.9,
+	n: 8,
+	/** Maximum fractional cut in release probability when all are active. */
+	brake: 0.75,
+};
+
 export const TRANSPORTERS = {
+	/** Neuronal transporters on the presynaptic membrane (DAT, SERT, NET, EAAT, GAT). */
 	pre: { r: 2.15, n: 9, x: -1 },
+	/** Postsynaptic neuronal transporters (amino-acid synapses only). */
 	post: { r: 2.3, n: 7, x: 1 },
+	/** Astrocyte transporters around the cleft rim (EAAT1/2, GAT-3). */
+	glia: { r: 2.85, n: 9, arc: Math.PI * 0.85 },
 	captureRadius: 0.6,
 };
 
+/** Extracellular COMT on the glial / postsynaptic side of the rim. */
 export const ENZYMES = {
 	count: 9,
-	captureRadius: 0.5,
+	captureRadius: 0.55,
+};
+
+/** Astrocyte process wrapping the back of the cleft (shared with the renderer). */
+export const ASTROCYTE = {
+	radius: 3.05,
+	arc: Math.PI * 1.0,
+};
+
+/** Probabilistic vesicle release. */
+export const RELEASE = {
+	/** Docking sites at the active zone (readily releasable pool). */
+	sites: 8,
+	/** Default per-vesicle fusion probability per action potential. */
+	probability: 0.35,
+};
+
+/**
+ * Presynaptic cytosolic transmitter: replenished by synthesis and reuptake,
+ * drained by vesicle filling (VMAT/VGLUT/VGAT) and, for monoamines, by
+ * mitochondrial MAO.
+ */
+export const CYTOSOL = {
+	synthesis: 8,
+	capacity: 150,
+	/** MAO breakdown rate (1/s) for monoamines. */
+	mao: 0.15,
+	/** Exponent linking cytosolic level to vesicle fill. */
+	fillExponent: 0.6,
+	minFill: 3,
+	maxFill: 20,
 };
 
 export const VESICLES = {
@@ -63,7 +106,6 @@ export const ACTION_POTENTIAL = {
 	travelTime: 0.45,
 	/** Delay between AP arrival and fusion (Ca²⁺ entry). */
 	calciumDelay: 0.08,
-	defaultVesicles: 3,
 };
 
 export const MEMBRANE = {
